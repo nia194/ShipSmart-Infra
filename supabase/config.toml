@@ -1,11 +1,8 @@
 # ShipSmart — Supabase project config
-# Migrated from Lovable project. Used by the Supabase CLI for local development,
-# migration management, and edge function deployment.
-#
-# The Lovable source config.toml contained only project_id — no additional
-# settings were configured. Standard Supabase CLI defaults apply.
+# Used by the Supabase CLI for local development, migration management, and
+# edge function deployment.
 
-project_id = "fihrsfvohaxhmqrcisyl"
+project_id = "fhlhadpuqylwvpesjhxj"
 
 [api]
 enabled = true
