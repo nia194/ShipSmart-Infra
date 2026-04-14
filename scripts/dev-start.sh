@@ -12,7 +12,7 @@
 #
 # Prerequisites:
 #   - Node 22+ and pnpm 9+ installed
-#   - Java 25 installed (or use SDKMAN: sdk install java 25-open)
+#   - Java 17+ installed (Spring Boot 3.4.4 minimum; use SDKMAN: sdk install java 17-open)
 #   - Python 3.13 installed
 #   - uv v0.6.5+ installed (curl -LsSf https://astral.sh/uv/install.sh | sh)
 #   - ShipSmart-Web/.env.local copied from .env.example and filled in
