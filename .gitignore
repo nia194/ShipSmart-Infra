@@ -1,0 +1,34 @@
+# ─── Claude / AI tooling (local only, never commit) ───────────────────────────
+.claude/
+
+# ─── Env / Secrets ────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── Dependencies / build ─────────────────────────────────────────────────────
+node_modules/
+dist/
+build/
+
+# ─── Supabase local state ─────────────────────────────────────────────────────
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+
+# ─── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── IDE ──────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ─── Archived monorepo render.yaml (keep for reference) ───────────────────────
+# render.yaml.legacy — NOT gitignored; kept as reference of pre-split config.
