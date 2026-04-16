@@ -30,5 +30,12 @@ Thumbs.db
 *.log
 logs/
 
+# ─── Sensitive / local-only docs ─────────────────────────────────────────────
+ENV-VARS-COPY-PASTE.md
+CREDENTIALS-GATHERING-GUIDE.md
+compare_section_prompt.md.pdf
+docs/*.docx
+docs/*.pdf
+
 # ─── Archived monorepo render.yaml (keep for reference) ───────────────────────
 # render.yaml.legacy — NOT gitignored; kept as reference of pre-split config.
