@@ -23,11 +23,12 @@ parent/
 
 ## Contents
 
-- `supabase/` — migrations, edge functions (14), config.toml.
+- `supabase/` — migrations, edge functions (14), SQL snippets, config.toml.
 - `scripts/` — `dev-start.sh`, `check-env.sh`, `run-mcp-server.sh` (adapted for sibling-repo layout).
+- `VERIFY-POST-DEPLOYMENT.sh` — automated post-deployment smoke-test script.
 - `docs/` — architecture, migration plans, phase notes, study guides.
 - `docs-ui/` — UI screenshots.
-- Root MDs — deployment runbooks, credential gathering, env-var references.
+- Root MDs — deployment runbooks (`DEPLOYMENT-DAY-RUNBOOK.md`), credential gathering (`CREDENTIALS-GATHERING-GUIDE.md`), env-var references (`ENV-VARS-COPY-PASTE.md`), FedEx integration summary (`FEDEX_INTEGRATION_SUMMARY.md`), Option-B1 automation guides (`OPTION-B1-START-HERE.md`, `OPTION-B1-AUTOMATION-INDEX.md`).
 - `render.yaml.legacy` — archived copy of the pre-split monorepo Render blueprint (reference only).
 - `.env.example` — aggregated env vars across all 3 services.
 
