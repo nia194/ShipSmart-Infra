@@ -1,0 +1,179 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ShipSmart — Render Blueprint Configuration
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Services:
+#   1. web          → React frontend (Static Site on CDN)
+#   2. api-java     → Spring Boot backend (Web Service) — transactional
+#   3. api-python   → FastAPI backend (Web Service) — AI/advisory
+#
+# BEFORE DEPLOYING: Set all sync:false env vars in the Render dashboard.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+
+  # ── React Frontend (Static Site) ──────────────────────────────────────────
+  - type: web
+    name: shipsmart-web
+    env: static
+    rootDir: apps/web
+    buildCommand: cd ../.. && pnpm install --frozen-lockfile && cd apps/web && pnpm build
+    staticPublishPath: dist
+    pullRequestPreviewsEnabled: true
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+      - key: VITE_JAVA_API_BASE_URL
+        value: https://shipsmart-api-java.onrender.com
+      - key: VITE_PYTHON_API_BASE_URL
+        value: https://shipsmart-api-python.onrender.com
+      - key: VITE_APP_ENV
+        value: production
+      # Feature flags — Java backend is the default in production.
+      # Set any to "false" to fall back to Supabase edge functions.
+      - key: VITE_USE_JAVA_QUOTES
+        value: "true"
+      - key: VITE_USE_JAVA_SAVED_OPTIONS
+        value: "true"
+      - key: VITE_USE_JAVA_BOOKING_REDIRECT
+        value: "true"
+
+  # ── Spring Boot Java API (Web Service) ───────────────────────────────────
+  - type: web
+    name: shipsmart-api-java
+    env: java
+    rootDir: apps/api-java
+    buildCommand: ./gradlew build -x test
+    startCommand: java -jar build/libs/shipsmart-api-java-0.1.0-SNAPSHOT.jar
+    plan: starter
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: production
+      - key: REQUIRE_JWT_SECRET
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_USERNAME
+        sync: false
+      - key: DATABASE_PASSWORD
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://shipsmart-web.onrender.com
+      - key: INTERNAL_PYTHON_API_URL
+        value: https://shipsmart-api-python.onrender.com
+      # ── FedEx Real API Integration ────────────────────────────────────────
+      - key: FEDEX_BASE_URL
+        value: https://apis.fedex.com
+      - key: FEDEX_CLIENT_ID
+        sync: false
+      - key: FEDEX_CLIENT_SECRET
+        sync: false
+      - key: FEDEX_ACCOUNT_NUMBER
+        sync: false
+
+  # ── FastAPI Python API (Web Service) ─────────────────────────────────────
+  # AI/advisory service: RAG, recommendations, shipping/tracking advisors.
+  - type: web
+    name: shipsmart-api-python
+    env: python
+    rootDir: apps/api-python
+    buildCommand: pip install uv && uv sync
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    plan: starter
+    healthCheckPath: /health
+
+  # ── MCP Tools Server (Web Service) ──────────────────────────────────────
+  # Exposes tool layer (validate_address, get_quote_preview) via MCP HTTP.
+  # Enables Claude Code, Spring Boot, and other MCP clients to call tools.
+  - type: web
+    name: shipsmart-mcp-tools
+    env: python
+    rootDir: apps/api-python
+    buildCommand: pip install uv && uv sync
+    startCommand: uvicorn app.mcp_server:app --host 0.0.0.0 --port $PORT
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://shipsmart-web.onrender.com
+      - key: INTERNAL_JAVA_API_URL
+        value: https://shipsmart-api-java.onrender.com
+      # ── Vector Store (RAG persistence) ────────────────────────────────────
+      # Default: memory (lost on restart, safe for testing)
+      # For production RAG: pgvector + Supabase PostgreSQL
+      - key: VECTOR_STORE_TYPE
+        value: memory
+      - key: DATABASE_URL
+        sync: false
+        # When VECTOR_STORE_TYPE=pgvector, set this to Supabase async PostgreSQL URL:
+        # postgresql://user:pass@project-ref.pooler.supabase.com:6543/postgres?sslmode=require
+      - key: PGVECTOR_TABLE
+        value: rag_chunks
+      # ── LLM Provider ──────────────────────────────────────────────────────
+      # Leave empty for EchoClient (mock, no external AI calls)
+      # Set to: openai, gemini, anthropic, llama, "" (empty = EchoClient)
+      - key: LLM_PROVIDER
+        value: ""
+      - key: OPENAI_API_KEY
+        sync: false
+      # ── Task-based LLM Routing (optional) ─────────────────────────────────
+      # Per-task provider selection. Empty = inherit LLM_PROVIDER.
+      # reasoning: shipping advisor, tracking advisor
+      # synthesis: RAG q&a, recommendation summary
+      # fallback: safety net if task provider unavailable
+      - key: LLM_PROVIDER_REASONING
+        value: ""
+      - key: LLM_PROVIDER_SYNTHESIS
+        value: ""
+      - key: LLM_PROVIDER_FALLBACK
+        value: echo
+      # ── Embeddings ────────────────────────────────────────────────────────
+      # Leave empty for LocalHashEmbedding (lexical, not semantic)
+      # Set to: openai (requires OPENAI_API_KEY)
+      - key: EMBEDDING_PROVIDER
+        value: ""
+      - key: EMBEDDING_MODEL
+        value: text-embedding-3-small
+      - key: EMBEDDING_DIMENSIONS
+        value: "1536"
+      # ── RAG / Knowledge Base ──────────────────────────────────────────────
+      - key: RAG_AUTO_INGEST
+        value: "true"
+      - key: RAG_DOCUMENTS_PATH
+        value: data/documents
+      - key: RAG_TOP_K
+        value: "3"
+      - key: RAG_CHUNK_SIZE
+        value: "500"
+      - key: RAG_CHUNK_OVERLAP
+        value: "50"
+      # ── Providers and tools ───────────────────────────────────────────────
+      - key: SHIPPING_PROVIDER
+        value: mock
+      - key: ENABLE_TOOLS
+        value: "true"
+      # ── Optional: Real Shipping Providers (for later phases) ────────────────
+      # Uncomment and set when enabling real carrier integrations
+      # - key: UPS_CLIENT_ID
+      #   sync: false
+      # - key: FEDEX_CLIENT_ID
+      #   sync: false
+      # - key: DHL_API_KEY
+      #   sync: false
