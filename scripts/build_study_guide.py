@@ -1,7 +1,7 @@
 """Generate ShipSmart Study Guide as a .docx file.
 
-Run:  python docs/build_study_guide.py
-Output: docs/ShipSmart-Study-Guide-v3.docx
+Run:  python scripts/build_study_guide.py
+Output: docs/assets/ShipSmart-Study-Guide-v3.docx
 """
 from docx import Document
 from docx.shared import Pt, RGBColor, Inches
@@ -1574,6 +1574,6 @@ P(doc, "Strategy for the day before: re-read column 1 once, then "
 
 
 # ── Save ──────────────────────────────────────────────────────────
-out = "docs/ShipSmart-Study-Guide-v3.docx"
+out = "docs/assets/ShipSmart-Study-Guide-v3.docx"
 doc.save(out)
 print(f"Wrote {out}")

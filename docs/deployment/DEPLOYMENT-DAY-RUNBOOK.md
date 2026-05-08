@@ -69,7 +69,7 @@ Minute 45-60:  Run verification tests
 - ☕ Grab a coffee
 - 📖 Read this document
 - 🔍 Gather your credentials
-- 📋 Have `ENV-VARS-COPY-PASTE.md` open
+- 📋 Have `docs/env/ENV-VARS-COPY-PASTE.md` open
 
 ### Monitor Build Progress
 
@@ -135,7 +135,7 @@ Green indicator appears next to each service name. You're ready for Step 3.
 5. All 6 should show in the list
 
 **Tips:**
-- Don't type manually; copy-paste from `ENV-VARS-COPY-PASTE.md`
+- Don't type manually; copy-paste from `docs/env/ENV-VARS-COPY-PASTE.md`
 - DATABASE_URL format: `postgresql://user:pass@host:5432/dbname`
 - Supabase keys are very long (starts with `eyJhbGc...`) — make sure you copy the entire value
 
@@ -261,10 +261,10 @@ Run the automated test script:
 cd /c/Users/ashis/OneDrive/Documents/ShipSmart
 
 # Make script executable
-chmod +x VERIFY-POST-DEPLOYMENT.sh
+chmod +x scripts/verify-post-deployment.sh
 
 # Run tests
-bash VERIFY-POST-DEPLOYMENT.sh
+bash scripts/verify-post-deployment.sh
 ```
 
 **Expected output:**
@@ -426,7 +426,7 @@ Share these with your team.
 
 ```bash
 # Test all services
-bash VERIFY-POST-DEPLOYMENT.sh
+bash scripts/verify-post-deployment.sh
 
 # Test individual endpoints
 curl https://shipsmart-api-java.onrender.com/api/v1/health
@@ -461,8 +461,8 @@ curl -X POST https://shipsmart-mcp-tools.onrender.com/tools/call \
 ## Support Resources
 
 - **Detailed checklist:** RENDER-DEPLOYMENT-CHECKLIST.md
-- **Env vars template:** ENV-VARS-COPY-PASTE.md
-- **Verification script:** VERIFY-POST-DEPLOYMENT.sh
+- **Env vars template:** docs/env/ENV-VARS-COPY-PASTE.md
+- **Verification script:** scripts/verify-post-deployment.sh
 - **Architecture docs:** docs/MCP-SERVER-SETUP.md
 - **Troubleshooting:** RENDER-DEPLOYMENT-CHECKLIST.md → Troubleshooting
 
