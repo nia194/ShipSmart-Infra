@@ -24,7 +24,7 @@ I just created **a complete, safe deployment automation system** for you:
 ## Your Next Steps (In Order)
 
 ### Step 1: Gather Credentials (10 minutes)
-**File:** `CREDENTIALS-GATHERING-GUIDE.md`
+**File:** `docs/env/CREDENTIALS-GATHERING-GUIDE.md`
 
 Read this file. It tells you:
 - Where to get FedEx credentials (developer.fedex.com)
@@ -40,20 +40,20 @@ Read this file. It tells you:
 
 Quick review:
 1. Read `OPTION-B1-AUTOMATION-INDEX.md` (this is the reference guide)
-2. Skim `ENV-VARS-COPY-PASTE.md` (you'll copy-paste from this)
-3. Keep `DEPLOYMENT-DAY-RUNBOOK.md` open during actual deployment
+2. Skim `docs/env/ENV-VARS-COPY-PASTE.md` (you'll copy-paste from this)
+3. Keep `docs/deployment/DEPLOYMENT-DAY-RUNBOOK.md` open during actual deployment
 
 ---
 
 ### Step 3: Deploy (60 minutes total)
-**File:** `DEPLOYMENT-DAY-RUNBOOK.md` (keep open in browser)
+**File:** `docs/deployment/DEPLOYMENT-DAY-RUNBOOK.md` (keep open in browser)
 
 Follow the 6-step process:
 1. Click "Deploy" in Render (1 min)
 2. Wait for builds (15 min)
-3. Copy-paste env vars (15 min) ← Uses `ENV-VARS-COPY-PASTE.md`
+3. Copy-paste env vars (15 min) ← Uses `docs/env/ENV-VARS-COPY-PASTE.md`
 4. Restart services (5 min)
-5. Run verification script (2 min) ← Uses `VERIFY-POST-DEPLOYMENT.sh`
+5. Run verification script (2 min) ← Uses `scripts/verify-post-deployment.sh`
 6. Test in Claude Code (5 min)
 
 **Total:** ~60 minutes (most is waiting for builds)
@@ -61,13 +61,13 @@ Follow the 6-step process:
 ---
 
 ### Step 4: Verify Everything Works (5 minutes)
-**File:** `VERIFY-POST-DEPLOYMENT.sh`
+**File:** `scripts/verify-post-deployment.sh`
 
 Automated test script runs after services are live:
 
 ```bash
 cd /c/Users/ashis/OneDrive/Documents/ShipSmart
-bash VERIFY-POST-DEPLOYMENT.sh
+bash scripts/verify-post-deployment.sh
 ```
 
 This automatically tests:
@@ -86,10 +86,10 @@ This automatically tests:
 | File | Purpose | Size | When to Use |
 |------|---------|------|-------------|
 | **OPTION-B1-AUTOMATION-INDEX.md** | Reference guide & index | 10 KB | Anytime for reference |
-| **CREDENTIALS-GATHERING-GUIDE.md** | How to get secrets | 8 KB | FIRST (before deployment) |
-| **ENV-VARS-COPY-PASTE.md** | Pre-formatted env vars | 9 KB | SECOND (copy-paste into Render) |
-| **DEPLOYMENT-DAY-RUNBOOK.md** | Step-by-step deploy guide | 12 KB | DURING deployment (keep open) |
-| **VERIFY-POST-DEPLOYMENT.sh** | Automated test script | 11 KB | AFTER services go Live |
+| **docs/env/CREDENTIALS-GATHERING-GUIDE.md** | How to get secrets | 8 KB | FIRST (before deployment) |
+| **docs/env/ENV-VARS-COPY-PASTE.md** | Pre-formatted env vars | 9 KB | SECOND (copy-paste into Render) |
+| **docs/deployment/DEPLOYMENT-DAY-RUNBOOK.md** | Step-by-step deploy guide | 12 KB | DURING deployment (keep open) |
+| **scripts/verify-post-deployment.sh** | Automated test script | 11 KB | AFTER services go Live |
 
 ---
 
@@ -143,9 +143,9 @@ This automatically tests:
 Day: Deployment Day
 ─────────────────────────────────
 
-T+0:00   Open CREDENTIALS-GATHERING-GUIDE.md (if not done)
+T+0:00   Open docs/env/CREDENTIALS-GATHERING-GUIDE.md (if not done)
 T+0:10   Gather credentials from FedEx + Supabase
-T+0:20   Open DEPLOYMENT-DAY-RUNBOOK.md in browser
+T+0:20   Open docs/deployment/DEPLOYMENT-DAY-RUNBOOK.md in browser
 T+0:21   Log into https://render.com
 T+0:22   Click "Deploy" button
 T+0:23   Services start building
@@ -154,7 +154,7 @@ T+0:23   Services start building
 T+0:38   Start copying env variables
 T+0:53   Restart services
 T+0:58   Services come back online
-T+1:00   Run: bash VERIFY-POST-DEPLOYMENT.sh
+T+1:00   Run: bash scripts/verify-post-deployment.sh
 T+1:02   See results: ✓ ALL TESTS PASSED
 T+1:07   Verify in Claude Code: @shipsmart-tools
 T+1:12   Done! 🎉
@@ -166,7 +166,7 @@ Total: ~70 minutes (mostly waiting for Render)
 
 ## What the Verification Script Does
 
-After deployment, running `VERIFY-POST-DEPLOYMENT.sh` automatically tests:
+After deployment, running `scripts/verify-post-deployment.sh` automatically tests:
 
 ```
 1. Frontend Loading
@@ -214,9 +214,9 @@ UI Clicks:
 └── Run bash script
 
 Reading:
-├── CREDENTIALS-GATHERING-GUIDE.md (5 min)
-├── ENV-VARS-COPY-PASTE.md (5 min)
-└── DEPLOYMENT-DAY-RUNBOOK.md (10 min, during deploy)
+├── docs/env/CREDENTIALS-GATHERING-GUIDE.md (5 min)
+├── docs/env/ENV-VARS-COPY-PASTE.md (5 min)
+└── docs/deployment/DEPLOYMENT-DAY-RUNBOOK.md (10 min, during deploy)
 
 Manual Verification:
 ├── Check Render "Live" status
@@ -254,7 +254,7 @@ Result: No human testing needed, 100% automated
 **A:** No! Copy-paste only. All values are pre-formatted.
 
 ### Q: What if something fails?
-**A:** Check DEPLOYMENT-DAY-RUNBOOK.md → Troubleshooting. The script tells you exactly what failed.
+**A:** Check docs/deployment/DEPLOYMENT-DAY-RUNBOOK.md → Troubleshooting. The script tells you exactly what failed.
 
 ### Q: Where do I store credentials?
 **A:** Password manager (1Password, LastPass, Bitwarden). NOT in files or GitHub.
@@ -270,22 +270,23 @@ Result: No human testing needed, 100% automated
 
 ---
 
-## Files on GitHub
+## Files in this repo
 
-All files are now on GitHub (main branch):
+GitHub: https://github.com/nia194/ShipSmart-Infra (main branch)
 
 ```
-https://github.com/nia194/ShipSmart
-
-Latest commit: "Add Option B1 deployment automation: scripts, guides, and checklists"
-
-New files:
-├── OPTION-B1-START-HERE.md              ← This file
-├── OPTION-B1-AUTOMATION-INDEX.md        ← Reference guide
-├── CREDENTIALS-GATHERING-GUIDE.md       ← How to get secrets
-├── ENV-VARS-COPY-PASTE.md               ← Copy-paste values
-├── DEPLOYMENT-DAY-RUNBOOK.md            ← Step-by-step guide
-└── VERIFY-POST-DEPLOYMENT.sh            ← Verification script
+ShipSmart-Infra/
+├── docs/
+│   ├── roadmap/
+│   │   ├── OPTION-B1-START-HERE.md             ← This file
+│   │   └── OPTION-B1-AUTOMATION-INDEX.md       ← Reference guide
+│   ├── env/
+│   │   ├── CREDENTIALS-GATHERING-GUIDE.md      ← How to get secrets (gitignored)
+│   │   └── ENV-VARS-COPY-PASTE.md              ← Copy-paste values (gitignored)
+│   └── deployment/
+│       └── DEPLOYMENT-DAY-RUNBOOK.md           ← Step-by-step guide
+└── scripts/
+    └── verify-post-deployment.sh               ← Verification script
 ```
 
 ---
@@ -294,13 +295,13 @@ New files:
 
 Before you deploy, verify:
 
-- [ ] You've read `CREDENTIALS-GATHERING-GUIDE.md`
+- [ ] You've read `docs/env/CREDENTIALS-GATHERING-GUIDE.md`
 - [ ] You have FedEx credentials (or know where to get them)
 - [ ] You have Supabase credentials (or know where to get them)
 - [ ] You're logged into Render.com
 - [ ] You can see ShipSmart project in Render
-- [ ] `DEPLOYMENT-DAY-RUNBOOK.md` is bookmarked/saved
-- [ ] `ENV-VARS-COPY-PASTE.md` is saved/bookmarked
+- [ ] `docs/deployment/DEPLOYMENT-DAY-RUNBOOK.md` is bookmarked/saved
+- [ ] `docs/env/ENV-VARS-COPY-PASTE.md` is saved/bookmarked
 - [ ] You're ready to spend ~70 minutes on deployment
 
 ---
@@ -318,11 +319,11 @@ You ──→ CREDENTIALS-GATHERING-GUIDE ──→ Get secrets from FedEx/Supab
   │
   ├──→ Step 2: Wait 15 min ──→ Services build
   │
-  ├──→ Step 3: Copy-paste vars ──→ Use ENV-VARS-COPY-PASTE.md
+  ├──→ Step 3: Copy-paste vars ──→ Use docs/env/ENV-VARS-COPY-PASTE.md
   │
   ├──→ Step 4: Restart services ──→ Services come online
   │
-  ├──→ Step 5: Run verification ──→ bash VERIFY-POST-DEPLOYMENT.sh
+  ├──→ Step 5: Run verification ──→ bash scripts/verify-post-deployment.sh
   │
   └──→ 🎉 Done! ──→ All services live and tested
 ```
@@ -333,10 +334,10 @@ You ──→ CREDENTIALS-GATHERING-GUIDE ──→ Get secrets from FedEx/Supab
 
 | Issue | Document |
 |-------|----------|
-| "Where do I get credentials?" | CREDENTIALS-GATHERING-GUIDE.md |
-| "What do I copy-paste?" | ENV-VARS-COPY-PASTE.md |
-| "What's the next step?" | DEPLOYMENT-DAY-RUNBOOK.md |
-| "How do I verify it works?" | VERIFY-POST-DEPLOYMENT.sh |
+| "Where do I get credentials?" | docs/env/CREDENTIALS-GATHERING-GUIDE.md |
+| "What do I copy-paste?" | docs/env/ENV-VARS-COPY-PASTE.md |
+| "What's the next step?" | docs/deployment/DEPLOYMENT-DAY-RUNBOOK.md |
+| "How do I verify it works?" | scripts/verify-post-deployment.sh |
 | "What's in each file?" | OPTION-B1-AUTOMATION-INDEX.md |
 
 ---
@@ -346,14 +347,14 @@ You ──→ CREDENTIALS-GATHERING-GUIDE ──→ Get secrets from FedEx/Supab
 👉 **When you're ready to deploy (within the next day or two):**
 
 1. **Read FIRST:**
-   - CREDENTIALS-GATHERING-GUIDE.md (5 min)
+   - docs/env/CREDENTIALS-GATHERING-GUIDE.md (5 min)
 
 2. **Gather SECOND:**
    - FedEx credentials from developer.fedex.com (5 min)
    - Supabase credentials from supabase.com (3 min)
 
 3. **Deploy THIRD:**
-   - Open DEPLOYMENT-DAY-RUNBOOK.md
+   - Open docs/deployment/DEPLOYMENT-DAY-RUNBOOK.md
    - Follow steps 1-5 (60 min)
    - Run verification script (2 min)
 
@@ -384,9 +385,9 @@ You ──→ CREDENTIALS-GATHERING-GUIDE ──→ Get secrets from FedEx/Supab
 Everything is ready. The deployment is safe, guided, and automated where it matters.
 
 **When you're ready:**
-1. Open `CREDENTIALS-GATHERING-GUIDE.md`
+1. Open `docs/env/CREDENTIALS-GATHERING-GUIDE.md`
 2. Gather your credentials
-3. Follow `DEPLOYMENT-DAY-RUNBOOK.md`
+3. Follow `docs/deployment/DEPLOYMENT-DAY-RUNBOOK.md`
 4. Run the verification script
 5. Done!
 
@@ -397,4 +398,4 @@ Everything is ready. The deployment is safe, guided, and automated where it matt
 **Confidence:** HIGH  
 **Ready for:** Immediate deployment
 
-👉 **Next:** Read CREDENTIALS-GATHERING-GUIDE.md when you're ready to deploy
+👉 **Next:** Read docs/env/CREDENTIALS-GATHERING-GUIDE.md when you're ready to deploy
