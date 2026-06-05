@@ -271,7 +271,46 @@ flowchart LR
 
 ---
 
-## 8. Glossary
+## 8. Hybrid + agentic RAG groundwork (2026-05-29 — Infra landed, Python pending)
+
+This is **data + config groundwork only**. The schema and env matrix below now exist; the Python
+code that consumes them lands in ShipSmart-API. Everything defaults to today's behavior.
+
+**Schema (additive, idempotent, Python-plane tables only — Java validate unaffected):**
+
+- `rag_chunks` gains a generated `text_tsv tsvector` column (`to_tsvector('english', text)`) + GIN
+  index, and a `match_rag_chunks_lexical(query_text, match_count) → (id, source, chunk_index, text,
+  score)` function ranked by `ts_rank_cd`. This is the **sparse** half of hybrid retrieval; the dense
+  `vector(1536)` + ivfflat path is untouched. (`20260529120000_rag_chunks_hybrid_lexical.sql`)
+- New optional `rag_query_log(id, request_id, query, plan_json, retrieved_chunk_ids, decision_path,
+  created_at)` — append-only **AI telemetry** for agentic runs. No money, no privileged actions, no FK
+  into user/business tables; RLS disabled like `rag_chunks`. Written only when the Python side sets
+  `RAG_QUERY_LOG=true`. (`20260529120500_rag_query_log.sql`)
+
+**Config (new Python env vars, all defaulting to today's behavior):**
+
+| Capability | Vars | Default = today |
+|---|---|---|
+| Hybrid retrieval | `RAG_HYBRID`, `RAG_HYBRID_ALPHA` | dense-only |
+| Agentic RAG | `RAG_MODE`, `RAG_AGENTIC_MAX_STEPS` | `normal` |
+| Observability | `RAG_QUERY_LOG` | off |
+| Fallback chain | `LLM_FALLBACK_CHAIN`, `LLM_RETRY_MAX_ATTEMPTS` | no fallback |
+| Context budgeting | `LLM_MAX_CONTEXT_TOKENS` | (budget enforced in API) |
+| Per-task overrides | `LLM_{MODEL,TEMPERATURE,MAX_TOKENS}_{REASONING,SYNTHESIS}` | provider default |
+| Guardrails | `GUARDRAILS_ENABLED`, `GUARDRAILS_BLOCK_ON_INJECTION` | off when unset (opt-in) |
+
+- **Hybrid** = run dense (cosine) and sparse (`ts_rank_cd`) retrieval, then fuse by `RAG_HYBRID_ALPHA`
+  (dense weight). **Agentic** = the advisor plans/iterates retrieval up to `RAG_AGENTIC_MAX_STEPS`.
+- **Decision-path tags** = ordered labels (e.g. `mode:agentic`, `retrieve:hybrid`, `synthesize`)
+  recorded per run in `rag_query_log.decision_path` for explainability.
+- LLM temperature overrides must stay in the system-wide low band (0.0–0.3).
+
+See `docs/rag/rag-architecture.md` for the retrieval-level detail and `docs/env/production-env-reference.md`
+for the full variable table.
+
+---
+
+## 9. Glossary
 
 - **Hydration** — Python's practice of calling Java with a forwarded user JWT to pull authoritative transactional data (e.g. real quote prices) into an LLM prompt. Prevents hallucinated numbers.
 - **Single-writer posture** — all DB mutations go through Java/JPA; no other service writes to Postgres, even when reading shared tables.
