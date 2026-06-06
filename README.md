@@ -212,9 +212,26 @@ cloned as siblings of this one.
 |---|---|
 | `dev-start.sh [web\|java\|python\|all]` | Start one or all sibling services with their expected ports (web 5173, java 8080, python 8000). Checks `.env` presence before launching. |
 | `check-env.sh` | Validate that each sibling repo has its `.env`/`.env.local` and that required keys are non-empty. Run this before `dev-start.sh`. |
+| `validate-infra.sh` | **This repo's test.** Greps the migrations + edge functions for the contract invariants downstream services depend on, and exits non-zero on drift. Run before deploying a schema/function change. |
 | `run-mcp-server.sh` | **Legacy** — still `cd`s into `ShipSmart-API`. The MCP code now lives in `ShipSmart-MCP`; start it with `cd ../ShipSmart-MCP && uv run uvicorn app.main:app --reload --port 8001` instead. |
 | `verify-post-deployment.sh` | Hit live `/health` endpoints across the deployed Render services and report status. Use after every promotion. |
 | `build_study_guide.py` | Compile architectural docs into `.docx`/`.pdf` study guides under `docs/assets/` (gitignored). |
+
+### Validation
+
+This repo has no application code to unit-test, so `validate-infra.sh` is its
+test suite — a lightweight guard for the invariants that, if they drift, silently
+break a consumer:
+
+```bash
+bash scripts/validate-infra.sh
+```
+
+It asserts (1) the hybrid-RAG `match_rag_chunks_lexical(...)` function exists and
+`RETURNS TABLE (id, source, chunk_index, text, score)` — the exact shape
+`ShipSmart-API`'s `pgvector_store.search_lexical()` unpacks and `ShipSmart-Test`'s
+contract test asserts; (2) every `supabase/functions/*/index.ts` registers a
+`Deno.serve` handler; (3) every migration filename is timestamp-orderable.
 
 ---
 
