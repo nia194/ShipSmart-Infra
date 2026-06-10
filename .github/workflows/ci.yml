@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# NOTE: the supabase/functions/ edge functions are LEGACY (frozen, pending
+# migration to ShipSmart-API/Orchestrator and deletion — see
+# docs/roadmap/legacy-edge-functions.md). They are intentionally NOT linted here;
+# CI checks the maintained automation scripts instead.
+jobs:
+  lint-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint shell scripts (errors only)
+        uses: ludeeus/action-shellcheck@master
+        with:
+          severity: error
+          scandir: ./scripts
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Lint Python scripts (ruff)
+        run: uvx ruff@0.9.0 check scripts/

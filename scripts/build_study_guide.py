@@ -4,7 +4,7 @@ Run:  python scripts/build_study_guide.py
 Output: docs/assets/ShipSmart-Study-Guide-v3.docx
 """
 from docx import Document
-from docx.shared import Pt, RGBColor, Inches
+from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 
