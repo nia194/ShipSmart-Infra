@@ -83,6 +83,15 @@ Complete reference for all environment variables by service.
 | `LLM_MAX_TOKENS_SYNTHESIS` | No | — | `""` | Max output tokens for synthesis |
 | `GUARDRAILS_ENABLED` | No | render.yaml | `false` † | Run input/output guardrails on advisor/RAG calls |
 | `GUARDRAILS_BLOCK_ON_INJECTION` | No | — | `false` † | Block on detected prompt injection (needs `GUARDRAILS_ENABLED`) |
+| `AUDIT_SINK` | No | render.yaml | `logging` | Audit/tracing sink: `logging` (structured logs) or `memory` |
+| `COMPLIANCE_ENABLED` | No | render.yaml | `true` | Gate `POST /compliance/check` (UC2; advisory only) |
+| `COMPLIANCE_CRITIQUE_MAX_ROUNDS` | No | — | `0` | UC2 critic rounds (`0` = off/deterministic; `>0` = model-in-the-loop) |
+| `COMPLIANCE_MAX_GAP_AREAS` | No | — | `3` | Max gap areas accepted from the critic per round |
+| `COMPLIANCE_VALUE_THRESHOLD_USD` | No | — | `2500` | Declared value (USD) that flags a commercial invoice (international) |
+| `WORKFLOW_ENABLED` | No | render.yaml | `false` | Gate the `/workflow/*` endpoints (UC3/UC4) |
+| `WORKFLOW_DURABLE` | No | render.yaml | `false` | `true` = SQLite checkpointer (survives restarts); else in-memory |
+| `WORKFLOW_CHECKPOINT_PATH` | No | — | `workflow_checkpoints.db` | SQLite file used when `WORKFLOW_DURABLE=true` |
+| `WORKFLOW_HIGH_RISK_AREAS` | No | — | `lithium_battery,import_restriction` | Unverified area here → suspend for human review |
 
 **Notes:**
 - Python API works fully with all defaults (mock provider, local embeddings, EchoClient LLM)
@@ -95,6 +104,9 @@ Complete reference for all environment variables by service.
 - † **Guardrails:** `.env.example` ships `GUARDRAILS_ENABLED=true`/`GUARDRAILS_BLOCK_ON_INJECTION=true`
   as the *recommended* values for new deployments, but the service default **when the var is unset is
   `false`** (passthrough = today). Set them explicitly to opt in.
+- **UC2/UC3/UC4 features** (`COMPLIANCE_*`, `WORKFLOW_*`, `AUDIT_SINK`) are additive and need **no
+  secrets**. Compliance is advisory and on by default; the workflow is **off** (`WORKFLOW_ENABLED=false`)
+  and runs fully keyless/in-memory until you opt in. Leaving them unset reproduces today's behavior.
 
 ---
 
