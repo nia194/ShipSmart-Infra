@@ -16,6 +16,8 @@ Complete reference for all environment variables by service.
 | `VITE_USE_JAVA_QUOTES` | Yes | render.yaml | `true` | Use Java API for quotes |
 | `VITE_USE_JAVA_SAVED_OPTIONS` | Yes | render.yaml | `true` | Use Java API for saved options |
 | `VITE_USE_JAVA_BOOKING_REDIRECT` | Yes | render.yaml | `true` | Use Java API for booking tracking |
+| `VITE_SHIPPING_SCOPE` | No | render.yaml | `worldwide` | `worldwide` (cross-border UI) or `domestic` (hide country fields + duties) |
+| `VITE_DOMESTIC_COUNTRY` | No | render.yaml | `US` | Home country shown when `VITE_SHIPPING_SCOPE=domestic` |
 
 **Notes:**
 - `VITE_` vars are baked into the static build at build time, not runtime
@@ -38,6 +40,7 @@ Complete reference for all environment variables by service.
 | `SUPABASE_JWT_SECRET` | Yes | Render dashboard | — | JWT signing secret (secret) |
 | `CORS_ALLOWED_ORIGINS` | Yes | render.yaml | — | Frontend origin for CORS |
 | `INTERNAL_PYTHON_API_URL` | No | render.yaml | — | Python API URL (reserved, not actively used) |
+| `SHIPPING_SCOPE` | No | render.yaml | `worldwide` | `worldwide` or `domestic` (suppress international carrier lanes); maps to `shipsmart.shipping.scope` |
 
 **Notes:**
 - `PORT` is injected by Render — do not set manually
@@ -84,7 +87,10 @@ Complete reference for all environment variables by service.
 | `GUARDRAILS_ENABLED` | No | render.yaml | `false` † | Run input/output guardrails on advisor/RAG calls |
 | `GUARDRAILS_BLOCK_ON_INJECTION` | No | — | `false` † | Block on detected prompt injection (needs `GUARDRAILS_ENABLED`) |
 | `AUDIT_SINK` | No | render.yaml | `logging` | Audit/tracing sink: `logging` (structured logs) or `memory` |
+| `SHIPPING_SCOPE` | No | render.yaml | `worldwide` | `worldwide` or `domestic` (US-only; rejects cross-border with 422); published on `GET /api/v1/info`. ShipSmart-MCP reads the same var |
+| `DOMESTIC_COUNTRY` | No | render.yaml | `US` | ISO-2 home country when `SHIPPING_SCOPE=domestic` |
 | `COMPLIANCE_ENABLED` | No | render.yaml | `true` | Gate `POST /compliance/check` (UC2; advisory only) |
+| `COMPLIANCE_EXPLICIT_ENABLED` | No | render.yaml | `true` | Additive: run the hard compliance pass on chat/workflow; `false` = normal flow only (skips the workflow HITL interrupt) |
 | `COMPLIANCE_CRITIQUE_MAX_ROUNDS` | No | — | `0` | UC2 critic rounds (`0` = off/deterministic; `>0` = model-in-the-loop) |
 | `COMPLIANCE_MAX_GAP_AREAS` | No | — | `3` | Max gap areas accepted from the critic per round |
 | `COMPLIANCE_VALUE_THRESHOLD_USD` | No | — | `2500` | Declared value (USD) that flags a commercial invoice (international) |
