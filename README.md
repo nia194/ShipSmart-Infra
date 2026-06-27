@@ -94,6 +94,7 @@ frontend can still fall back to via feature flags.
 | Postgres schema (tables, RLS, triggers) | `supabase/migrations/` | Java Orchestrator (Flyway validate at boot); Web fallback edge fns |
 | `idempotency_keys`, `audit_log`, optimistic-locking, soft-delete, `status` columns | `supabase/migrations/20260417120000_interview_upgrade.sql` | Java Orchestrator (writes); Web reads via Java |
 | `rag_chunks` pgvector table | `supabase/migrations/20260408034204_create_rag_chunks.sql` | Python `ShipSmart-API` (RAG retrieval) |
+| `conversations`, `conversation_messages` (concierge recall) | `supabase/migrations/20260626120000_create_conversations.sql` | Python `ShipSmart-API` (CONVERSATION_STORE=postgres) |
 | Legacy/fallback edge functions (14) | `supabase/functions/` | Web SPA when `VITE_USE_JAVA_*=false` |
 | Local dev orchestration (multi-repo) | `scripts/dev-start.sh`, `check-env.sh`, `verify-post-deployment.sh` | Engineer workstations |
 | Aggregated env-var matrix | `.env.example`, `docs/env/` | All four service repos |
@@ -150,14 +151,17 @@ Flyway (in the Java Orchestrator) order them identically.
 | `20260404030242_…sql` | Schema follow-up corrections. |
 | `20260408034204_create_rag_chunks.sql` | `rag_chunks` table with `vector(1536)` column for `ShipSmart-API`'s pgvector RAG store. |
 | `20260417120000_interview_upgrade.sql` | Optimistic-locking (`version`, `updated_at`), soft-delete (`deleted_at`), `status` columns, plus new `idempotency_keys` and `audit_log` tables consumed by the Java Orchestrator. Flyway runs in *validate* mode and mirrors this file 1:1. |
+| `20260626120000_create_conversations.sql` | `conversations` + `conversation_messages` for the Conversational Concierge's server-side recall. Python-owned data plane (direct asyncpg, written only when `CONVERSATION_STORE=postgres`); additive, no FK into business tables, no RLS coupling — **not** mirrored to Java Flyway. |
 
 > **Schema contract:** the Java Orchestrator boots with
 > `FlywayValidationRunner` in validate-mode — a pending or drifted
-> migration is fatal at startup. When changing schema, land the
+> migration is fatal at startup. When changing a **Java-owned** table, land the
 > migration here first, copy the same `.sql` file into
 > `ShipSmart-Orchestrator/src/main/resources/db/migration/`, then ship
-> both repos together. The Python service does not write to these
-> tables; it only reads `rag_chunks`.
+> both repos together. **Python-owned data-plane** tables (`rag_chunks`,
+> `rag_query_log`, `conversations`/`conversation_messages`) are additive and
+> accessed only by `ShipSmart-API` via direct asyncpg — they are **not** mirrored
+> to Java Flyway and never affect its validate.
 
 Apply locally:
 
