@@ -115,8 +115,11 @@ ShipSmart-Infra/
 │   │   ├── 20260404030225_*.sql     Initial schema
 │   │   ├── 20260404030242_*.sql     Schema follow-up
 │   │   ├── 20260408034204_create_rag_chunks.sql        pgvector table for Python RAG
-│   │   └── 20260417120000_interview_upgrade.sql        version/updated_at/deleted_at/status
-│   │                                                   + idempotency_keys + audit_log
+│   │   ├── 20260417120000_interview_upgrade.sql        version/updated_at/deleted_at/status
+│   │   │                                               + idempotency_keys + audit_log
+│   │   ├── 20260529120000_rag_chunks_hybrid_lexical.sql tsvector + match_rag_chunks_lexical (hybrid RAG)
+│   │   ├── 20260529120500_rag_query_log.sql            agentic-RAG observability sink (opt-in)
+│   │   └── 20260626120000_create_conversations.sql     concierge recall (conversations + messages)
 │   ├── functions/                   14 Deno edge functions (see table below)
 │   └── snippets/                    Reference SQL snippets (not auto-applied)
 │
@@ -151,6 +154,8 @@ Flyway (in the Java Orchestrator) order them identically.
 | `20260404030242_…sql` | Schema follow-up corrections. |
 | `20260408034204_create_rag_chunks.sql` | `rag_chunks` table with `vector(1536)` column for `ShipSmart-API`'s pgvector RAG store. |
 | `20260417120000_interview_upgrade.sql` | Optimistic-locking (`version`, `updated_at`), soft-delete (`deleted_at`), `status` columns, plus new `idempotency_keys` and `audit_log` tables consumed by the Java Orchestrator. Flyway runs in *validate* mode and mirrors this file 1:1. |
+| `20260529120000_rag_chunks_hybrid_lexical.sql` | Adds a generated `tsvector` column + GIN index and the `match_rag_chunks_lexical(...)` ranking function to `rag_chunks`, so `ShipSmart-API` can run a lexical query alongside the dense pgvector query and fuse them (hybrid RAG). Additive + idempotent; leaves the dense path untouched. Python-owned plane — **not** mirrored to Java Flyway. |
+| `20260529120500_rag_query_log.sql` | Append-only `rag_query_log` sink for agentic-RAG observability (plan, retrieved chunks, decision path). Written only when `RAG_QUERY_LOG=true` (off by default); telemetry with no FK into business tables and no RLS coupling. Python-owned plane — **not** mirrored to Java Flyway. |
 | `20260626120000_create_conversations.sql` | `conversations` + `conversation_messages` for the Conversational Concierge's server-side recall. Python-owned data plane (direct asyncpg, written only when `CONVERSATION_STORE=postgres`); additive, no FK into business tables, no RLS coupling — **not** mirrored to Java Flyway. |
 
 > **Schema contract:** the Java Orchestrator boots with
