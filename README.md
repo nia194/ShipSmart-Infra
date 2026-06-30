@@ -242,6 +242,11 @@ It asserts (1) the hybrid-RAG `match_rag_chunks_lexical(...)` function exists an
 contract test asserts; (2) every `supabase/functions/*/index.ts` registers a
 `Deno.serve` handler; (3) every migration filename is timestamp-orderable.
 
+CI (`.github/workflows/ci.yml`) does not run `validate-infra.sh`; instead it lints the
+**maintained automation scripts** — **shellcheck** (errors only) over `scripts/*.sh` and
+**ruff** over the Python scripts. The legacy edge functions are intentionally not linted
+(they are frozen pending migration/retirement — see `docs/roadmap/`).
+
 ---
 
 ## Documentation map
@@ -282,7 +287,7 @@ specialized material.
 
 ### Prerequisites
 
-- **Node.js 22+** and **pnpm 9+** (for `ShipSmart-Web`)
+- **Node.js 20+** and **pnpm 9+** (for `ShipSmart-Web`)
 - **Java 17+** (for `ShipSmart-Orchestrator`)
 - **Python 3.13** and [`uv`](https://docs.astral.sh/uv/) 0.6.5+ (for `ShipSmart-API` and `ShipSmart-MCP`)
 - **Supabase CLI** (for migrations + edge functions)
