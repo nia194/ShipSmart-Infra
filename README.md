@@ -10,7 +10,7 @@
 Single-source-of-truth repo for everything that lives *between* the four
 ShipSmart services: Supabase schema migrations, edge functions, local
 dev scripts, environment matrices, deployment runbooks, and the
-architectural docs that describe how the five repos fit together.
+architectural docs that describe how the sibling repos fit together.
 
 This repo has **no Render service of its own** — it ships database
 schema, edge functions, and the documentation that the other four
@@ -38,7 +38,7 @@ repos consume.
 
 ## The ShipSmart ecosystem
 
-ShipSmart is split across five sibling repositories. Clone them under
+ShipSmart is split across six sibling repositories. Clone them under
 the same parent directory so the dev scripts in this repo can find them
 by relative path.
 
@@ -49,6 +49,7 @@ by relative path.
 | [ShipSmart-API](https://github.com/nia194/ShipSmart-API) | Python AI/orchestration service — RAG, advisors, recommendations, compliance (UC2), multi-agent workflow (UC3/UC4) | FastAPI, Python 3.13 | `shipsmart-api-python` |
 | [ShipSmart-MCP](https://github.com/nia194/ShipSmart-MCP) | MCP tool server — `validate_address`, `get_quote_preview` (provider-pluggable) | FastAPI + MCP | `shipsmart-mcp` |
 | **[ShipSmart-Infra](https://github.com/nia194/ShipSmart-Infra)** *(this repo)* | Supabase schema + edge functions + deployment configs + docs | Supabase, Deno, Bash, Markdown | — (no Render service) |
+| [ShipSmart-Test](https://github.com/nia194/ShipSmart-Test) | Cross-repo integration harness — contract + live e2e suites, cross-service Postman collection | Python 3.13, pytest | — (no Render service) |
 
 ```
               ┌──────────────────────────────┐
@@ -127,6 +128,7 @@ ShipSmart-Infra/
 │   ├── dev-start.sh                 Start web/java/python siblings (one or all)
 │   ├── check-env.sh                 Validate every repo's .env before dev-start
 │   ├── run-mcp-server.sh            Legacy: still cd's into ShipSmart-API
+│   ├── validate-infra.sh            This repo's test — contract-invariant guard over migrations + functions
 │   ├── verify-post-deployment.sh    Smoke-test deployed services
 │   └── build_study_guide.py         Generate study-guide artifacts under docs/assets/
 │
@@ -291,7 +293,7 @@ specialized material.
 - **Java 17+** (for `ShipSmart-Orchestrator`)
 - **Python 3.13** and [`uv`](https://docs.astral.sh/uv/) 0.6.5+ (for `ShipSmart-API` and `ShipSmart-MCP`)
 - **Supabase CLI** (for migrations + edge functions)
-- All 5 repos cloned as siblings under the same parent directory
+- All six repos cloned as siblings under the same parent directory
 
 ```
 parent/
@@ -299,6 +301,7 @@ parent/
 ├── ShipSmart-Orchestrator/
 ├── ShipSmart-API/
 ├── ShipSmart-MCP/
+├── ShipSmart-Test/    (cross-repo contract + e2e)
 └── ShipSmart-Infra/   (you are here)
 ```
 
