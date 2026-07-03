@@ -54,7 +54,7 @@ Follow the 6-step process:
 3. Copy-paste env vars (15 min) ← Uses `docs/env/ENV-VARS-COPY-PASTE.md`
 4. Restart services (5 min)
 5. Run verification script (2 min) ← Uses `scripts/verify-post-deployment.sh`
-6. Test in Claude Code (5 min)
+6. Test in your MCP client (5 min)
 
 **Total:** ~60 minutes (most is waiting for builds)
 
@@ -121,7 +121,7 @@ This automatically tests:
 - Click "Deploy" button in Render UI
 - Copy-paste env variables
 - Run the verification script
-- Verify tools in Claude Code
+- Verify tools in the MCP client
 
 ---
 
@@ -156,7 +156,7 @@ T+0:53   Restart services
 T+0:58   Services come back online
 T+1:00   Run: bash scripts/verify-post-deployment.sh
 T+1:02   See results: ✓ ALL TESTS PASSED
-T+1:07   Verify in Claude Code: @shipsmart-tools
+T+1:07   Verify in your MCP client: @shipsmart-tools
 T+1:12   Done! 🎉
 
 Total: ~70 minutes (mostly waiting for Render)
@@ -197,7 +197,7 @@ If all pass:
 ════════════════════════════════════
 ✓ ALL CRITICAL TESTS PASSED!
 ════════════════════════════════════
-Next steps: Verify in Claude Code, monitor logs
+Next steps: Verify in the MCP client, monitor logs
 ```
 
 ---
@@ -221,7 +221,7 @@ Reading:
 Manual Verification:
 ├── Check Render "Live" status
 ├── Verify test script output
-└── Test @shipsmart-tools in Claude Code
+└── Test @shipsmart-tools in the MCP client
 
 Total: ~70 minutes (most is waiting)
 ```
@@ -361,7 +361,7 @@ You ──→ CREDENTIALS-GATHERING-GUIDE ──→ Get secrets from FedEx/Supab
 4. **Done:**
    - All 4 services live
    - All tests passing
-   - Tools discoverable in Claude Code
+   - Tools discoverable in the MCP client
 
 ---
 

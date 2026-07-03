@@ -1,6 +1,3 @@
-# ─── Claude / AI tooling (local only, never commit) ───────────────────────────
-.claude/
-
 # ─── Env / Secrets ────────────────────────────────────────────────────────────
 .env
 .env.*

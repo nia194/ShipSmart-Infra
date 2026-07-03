@@ -110,7 +110,7 @@ T+0:35   You restart services (5 min)
 T+0:40   Services come back online
 T+0:45   You run scripts/verify-post-deployment.sh
 T+0:47   I provide test results ✓
-T+0:50   You verify in Claude Code (@shipsmart-tools)
+T+0:50   You verify in your MCP client (@shipsmart-tools)
 T+1:00   Done! All verified and working
 
 Total time: ~1 hour
@@ -132,7 +132,7 @@ Total time: ~1 hour
 | Copy-paste env vars | 15 min | Render UI | 12 values total |
 | Restart services | 5 min | Render UI | Click buttons |
 | Run test script | 2 min | Terminal | `bash scripts/verify-post-deployment.sh` |
-| Verify in Claude Code | 5 min | Claude Code IDE | Test tool discovery |
+| Verify in the MCP client | 5 min | MCP-capable IDE | Test tool discovery |
 | **TOTAL** | **~70 min** | | Most is waiting/watching |
 
 ---
@@ -192,7 +192,7 @@ Each service repo (ShipSmart-Web, ShipSmart-Orchestrator, ShipSmart-API) owns it
 6. Check results
 
 ### After Deployment
-1. Verify in Claude Code: `@shipsmart-tools`
+1. Verify in your MCP client: `@shipsmart-tools`
 2. Test quote flow in browser
 3. Monitor Render logs for 24 hours
 4. You're done! 🎉
@@ -238,7 +238,7 @@ Each service repo (ShipSmart-Web, ShipSmart-Orchestrator, ShipSmart-API) owns it
 ✅ **You successfully deployed if:**
 - All 4 services show green "Live" in Render
 - `scripts/verify-post-deployment.sh` returns all ✓
-- Claude Code can discover tools (@shipsmart-tools)
+- The MCP client can discover tools (@shipsmart-tools)
 - Quote flow works in React frontend
 - No errors in Render service logs
 
