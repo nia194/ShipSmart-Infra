@@ -127,7 +127,6 @@ ShipSmart-Infra/
 ├── scripts/
 │   ├── dev-start.sh                 Start web/java/python siblings (one or all)
 │   ├── check-env.sh                 Validate every repo's .env before dev-start
-│   ├── run-mcp-server.sh            Legacy: still cd's into ShipSmart-API
 │   ├── validate-infra.sh            This repo's test — contract-invariant guard over migrations + functions
 │   ├── verify-post-deployment.sh    Smoke-test deployed services
 │   └── build_study_guide.py         Generate study-guide artifacts under docs/assets/
@@ -224,7 +223,6 @@ cloned as siblings of this one.
 | `dev-start.sh [web\|java\|python\|all]` | Start one or all sibling services with their expected ports (web 5173, java 8080, python 8000). Checks `.env` presence before launching. |
 | `check-env.sh` | Validate that each sibling repo has its `.env`/`.env.local` and that required keys are non-empty. Run this before `dev-start.sh`. |
 | `validate-infra.sh` | **This repo's test.** Greps the migrations + edge functions for the contract invariants downstream services depend on, and exits non-zero on drift. Run before deploying a schema/function change. |
-| `run-mcp-server.sh` | **Legacy** — still `cd`s into `ShipSmart-API`. The MCP code now lives in `ShipSmart-MCP`; start it with `cd ../ShipSmart-MCP && uv run uvicorn app.main:app --reload --port 8001` instead. |
 | `verify-post-deployment.sh` | Hit live `/health` endpoints across the deployed Render services and report status. Use after every promotion. |
 | `build_study_guide.py` | Compile architectural docs into `.docx`/`.pdf` study guides under `docs/assets/` (gitignored). |
 
@@ -332,7 +330,7 @@ bash scripts/dev-start.sh web      # http://localhost:5173
 bash scripts/dev-start.sh java     # http://localhost:8080
 bash scripts/dev-start.sh python   # http://localhost:8000
 
-# MCP server is started separately (the script's run-mcp-server.sh helper is legacy):
+# MCP server is started separately:
 cd ../ShipSmart-MCP && uv run uvicorn app.main:app --reload --port 8001
 ```
 
