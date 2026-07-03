@@ -30,4 +30,4 @@ enable_confirmations = false
 
 [functions]
 # All 14 legacy edge functions are deployed from supabase/functions/.
-# See docs/legacy-edge-functions.md for classification and migration targets.
+# See docs/roadmap/legacy-edge-functions.md for classification and migration targets.
