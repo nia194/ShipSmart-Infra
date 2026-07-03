@@ -97,7 +97,7 @@ services:
 
   # ── MCP Tools Server (Web Service) ──────────────────────────────────────
   # Exposes tool layer (validate_address, get_quote_preview) via MCP HTTP.
-  # Enables Claude Code, Spring Boot, and other MCP clients to call tools.
+  # Enables IDE assistants, Spring Boot, and other MCP clients to call tools.
   - type: web
     name: shipsmart-mcp-tools
     env: python

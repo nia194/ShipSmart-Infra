@@ -282,7 +282,7 @@ bash scripts/verify-post-deployment.sh
 ════════════════════════════════════════════════
 ```
 
-### Test 3: Manual Claude Code Verification (5 minutes)
+### Test 3: Manual MCP Client Verification (5 minutes)
 
 1. Update `.mcp.json` to use production URL:
    ```json
@@ -296,9 +296,9 @@ bash scripts/verify-post-deployment.sh
    }
    ```
 
-2. **Restart Claude Code** (close and reopen)
+2. **Restart your MCP client** (close and reopen)
 
-3. In Claude Code, try:
+3. In the MCP client, try:
    ```
    @shipsmart-tools
    validate this address: 123 Main St, San Francisco, CA 94105
@@ -356,7 +356,7 @@ bash scripts/verify-post-deployment.sh
 
 ---
 
-### Issue: CORS error in Claude Code
+### Issue: CORS error in the MCP client
 
 **Fix:**
 1. Check CORS_ALLOWED_ORIGINS in Java API environment
@@ -370,7 +370,7 @@ bash scripts/verify-post-deployment.sh
 - [ ] All 4 services show green "Live" status
 - [ ] Health check curl commands return 200
 - [ ] Automated test script passes all tests
-- [ ] Claude Code can discover tools (@shipsmart-tools)
+- [ ] The MCP client can discover tools (@shipsmart-tools)
 - [ ] Quote flow works end-to-end in browser
 - [ ] MCP tools execute (validate_address, get_quote_preview)
 - [ ] No error messages in Render logs
