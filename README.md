@@ -40,7 +40,9 @@ repos consume.
 
 ShipSmart is split across six sibling repositories. Clone them under
 the same parent directory so the dev scripts in this repo can find them
-by relative path.
+by relative path. All six are also mirrored together in
+**[ShipSmart](https://github.com/nia194/ShipSmart)** — the umbrella
+repository that snapshots each component at its latest stable milestone.
 
 | Repo | Role | Stack | Render service |
 |---|---|---|---|
