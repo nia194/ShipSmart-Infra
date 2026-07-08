@@ -16,6 +16,8 @@
 #      contract test asserts.
 #   2. Every supabase/functions/*/index.ts registers a Deno.serve handler.
 #   3. Every migration filename is Flyway/Supabase-orderable (14-digit timestamp).
+#   4. The AI-event audit log (ai_audit_log) is append-only (WORM trigger) with a
+#      pseudonymized identity column — never raw identity, never mutable.
 
 set -uo pipefail
 INFRA_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -70,6 +72,24 @@ for mig in "$MIGRATIONS"/*.sql; do
   fi
 done
 [ "$mig_count" -eq 0 ] && fail "no migrations found under supabase/migrations/"
+
+echo "== 4. AI-event audit log is append-only (WORM) ======================"
+AUDIT_FILE="$(grep -rl "CREATE TABLE IF NOT EXISTS public.ai_audit_log" "$MIGRATIONS" 2>/dev/null | head -1)"
+if [ -z "$AUDIT_FILE" ]; then
+  fail "ai_audit_log table not defined in any migration"
+else
+  pass "defined in $(basename "$AUDIT_FILE")"
+  if grep -q "session_id_hash" "$AUDIT_FILE"; then
+    pass "identity is pseudonymized (session_id_hash)"
+  else
+    fail "ai_audit_log has no session_id_hash (must not store raw identity)"
+  fi
+  if grep -qE "append-only" "$AUDIT_FILE"; then
+    pass "append-only WORM guard present"
+  else
+    fail "ai_audit_log has no append-only (WORM) guard"
+  fi
+fi
 
 echo "====================================================================="
 if [ "$ERRORS" -eq 0 ]; then
