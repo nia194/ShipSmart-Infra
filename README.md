@@ -23,19 +23,25 @@ the live system, see the umbrella's live-mesh links.)
 **Stack:** Supabase (Postgres 15 + Auth) · pgvector · tsvector/GIN lexical ·
 Deno/TypeScript edge functions · Bash tooling · shellcheck + ruff CI
 
+> **Metric convention:** structural counts and retention classes are facts
+> verified against the migrations; performance/durability figures are
+> **(target)** / **(illustrative)**.
+
 ---
 
 ## Table of contents
 
 - [The ShipSmart ecosystem](#the-shipsmart-ecosystem)
-- [What this repo owns](#what-this-repo-owns)
-- [Migrations](#migrations)
+- [What this repo owns (HLD)](#what-this-repo-owns-hld)
+- [Data model (ER)](#data-model-er)
 - [Row-Level Security](#row-level-security)
 - [The WORM audit ledger](#the-worm-audit-ledger)
 - [Hybrid vector search](#hybrid-vector-search)
+- [Migration timeline](#migration-timeline)
 - [Edge functions](#edge-functions)
-- [The four-invariant validator](#the-four-invariant-validator)
 - [Governance read side](#governance-read-side)
+- [The four-invariant validator](#the-four-invariant-validator)
+- [Threat model](#threat-model)
 - [Scripts & local development](#scripts--local-development)
 - [License](#license)
 
@@ -60,7 +66,37 @@ repository that snapshots each component at a pinned commit (see its
 
 ---
 
-## What this repo owns
+## What this repo owns (HLD)
+
+**Figure 1 — the substrate and its three consumers.** One schema serves three
+runtimes — which is exactly why it is treated as **contract-checked code**, not
+"the database."
+
+```mermaid
+flowchart TB
+    subgraph EDGE["14 Deno edge functions"]
+        EF1["ai-* advisories (4)"]
+        EF2["quotes + saved options (4)"]
+        EF3["booking / address / logistics (5)"]
+        EF4[import-tracking-from-email]
+    end
+    subgraph PG["Supabase PostgreSQL"]
+        CORE["core tables (RLS ×8): profiles · user_roles · shipment_requests · quotes · saved_options · redirect_tracking · idempotency_keys · audit_log"]
+        RAGT["rag_chunks (pgvector + text_tsv GIN + governance cols) · rag_query_log"]
+        CONV["conversations · conversation_messages"]
+        WORM["ai_audit_log (WORM trigger + retention fn)"]
+        VIEW["ai_guardrail_daily (view)"]
+    end
+    VAL["validate-infra.sh — 4 invariants (CI)"]
+    JAVA["Java Orchestrator — JPA, ddl-auto: validate"] --> CORE
+    API["Python API — asyncpg"] --> RAGT
+    API --> WORM
+    API --> CONV
+    WEB["Web SPA"] --> EDGE --> CORE
+    DASH["Dashboards / alerts"] --> VIEW
+    VAL -.-> PG
+    VAL -.-> EDGE
+```
 
 ```
 supabase/
@@ -71,96 +107,269 @@ scripts/        validate-infra.sh · check-env.sh · dev-start.sh ·
                 verify-post-deployment.sh
 ```
 
-Three runtimes consume this one schema — Java via JPA with
-`ddl-auto: validate`, Python via asyncpg, the Web via edge functions — which is
-exactly why it is treated as **contract-checked code**, not "the database."
+---
 
-## Migrations
+## Data model (ER)
 
-**11 forward-only migrations** (2026-04 → 2026-07): core tables → pgvector RAG
-store → idempotency/audit hardening → **hybrid lexical** (tsvector + GIN +
-ranking function) → retrieval telemetry → concierge conversations → **WORM
-`ai_audit_log`** → RAG governance columns (embedding version, tenant seam) →
-guardrail metrics view → **retention schedule**.
+**Figure 2 — core + AI-plane entities (key fields).** Governance columns live
+**on the data**: embedding version (feeds the API's fail-closed startup check),
+tenant/role (the multi-tenant seam), retention class (drives the WORM delete
+window).
 
-Rules: timestamp-named, never edited after apply, idempotent
-(`IF NOT EXISTS` / `CREATE OR REPLACE`), additive — the Java `validate` contract
-keeps passing.
+```mermaid
+erDiagram
+    PROFILES ||--o{ SHIPMENT_REQUESTS : owns
+    PROFILES ||--o{ SAVED_OPTIONS : owns
+    PROFILES ||--o{ USER_ROLES : has
+    SHIPMENT_REQUESTS ||--o{ QUOTES : yields
+    QUOTES ||--o{ REDIRECT_TRACKING : "booked via"
+    PROFILES {
+        uuid id PK "RLS"
+    }
+    SHIPMENT_REQUESTS {
+        uuid id PK
+        uuid user_id FK "RLS owner"
+    }
+    QUOTES {
+        uuid id PK
+        uuid shipment_request_id FK
+        timestamptz expires_at
+    }
+    RAG_CHUNKS {
+        bigint id PK
+        vector embedding "pgvector"
+        tsvector text_tsv "GIN indexed"
+        text embedding_model "governance"
+        text embedding_version "startup compat check"
+        text tenant_id "isolation seam"
+        text user_role
+    }
+    RAG_QUERY_LOG {
+        bigint id PK
+        text query
+        timestamptz at
+    }
+    CONVERSATIONS ||--o{ CONVERSATION_MESSAGES : contains
+    AI_AUDIT_LOG {
+        bigint id PK
+        text session_id_hash "pseudonymized"
+        text retention_class "pii_short|standard|extended"
+        text[] decisions
+        text[] guardrail_events
+        timestamptz at
+    }
+    IDEMPOTENCY_KEYS {
+        text key PK "RLS"
+    }
+    AUDIT_LOG {
+        uuid id PK "RLS"
+    }
+```
+
+*(Field lists are representative of the key columns — the migrations are the
+authoritative source.)*
+
+---
 
 ## Row-Level Security
 
-RLS is **enabled on all 8 core user-owned tables** — `profiles`, `user_roles`,
-`shipment_requests`, `quotes`, `saved_options`, `redirect_tracking`,
-`idempotency_keys`, `audit_log` — with owner-scoped policies. Isolation is
-enforced **inside the database**, so even a compromised app path can't read
-across users. (The newer AI-plane tables are service-role-accessed by design;
-their RLS hardening is tracked as a governance follow-up.)
+| Table | RLS | Policy |
+|---|---|---|
+| profiles · user_roles · shipment_requests · quotes · saved_options · redirect_tracking · idempotency_keys · audit_log | ✅ enabled | owner-scoped (user owns their rows) |
+| rag_chunks · rag_query_log · conversations · ai_audit_log | service-role access | by design; RLS hardening tracked as a governance follow-up |
+
+Isolation for user-owned data is enforced **inside the database** — even a
+compromised app path can't read across users.
+
+---
 
 ## The WORM audit ledger
 
-`ai_audit_log` is append-only by **trigger**, not by promise:
+**Figure 3 — `ai_audit_log` lifecycle.** Tamper-evidence is a `BEFORE UPDATE OR
+DELETE` **trigger**, not an application promise; even the retention job's
+delete permission is scoped to its own transaction.
 
-- `UPDATE` ⇒ `RAISE EXCEPTION` — always.
-- `DELETE` ⇒ blocked **unless** the transaction-scoped GUC
-  `shipsmart.retention_job = 'on'` — which only
-  `ai_audit_log_apply_retention()` sets, for its own transaction.
-- Identity is pseudonymized (`session_id_hash`); free text is redacted upstream.
-- Retention classes: **`pii_short` 30 days · `standard` 13 months · `extended`
-  24 months** — a `CASE` in a reviewed SQL function, designed for a daily call.
+```mermaid
+stateDiagram-v2
+    [*] --> Appended: INSERT (always allowed)
+    Appended --> Appended: UPDATE attempt -> RAISE EXCEPTION (always)
+    Appended --> Retained: age < retention window
+    Retained --> Retained: DELETE without GUC -> RAISE EXCEPTION
+    Retained --> Deleted: DELETE only when shipsmart.retention_job = on
+    Deleted --> [*]
+    note right of Retained
+        ai_audit_log_apply_retention():
+        pii_short = 30 days
+        standard = 13 months (default)
+        extended = 24 months
+        GUC authorized for its own txn only — call daily
+    end note
+```
 
+Identity is pseudonymized (`session_id_hash`); free text is redacted upstream.
 "Prove what the AI did" is a query — and the record can neither be silently
 edited nor silently evaporate.
 
+---
+
 ## Hybrid vector search
 
-`rag_chunks` supports both retrieval modes **inside Postgres**:
+**Figure 4 — dense + lexical inside Postgres.** The lexical function's **column
+shape is a CI-checked contract** with the API — the classic "DB function
+changed, app silently broke" failure is made impossible.
 
-- **Dense:** pgvector cosine over embeddings.
-- **Lexical:** a `text_tsv` tsvector + **GIN** index ranked by `ts_rank_cd`
-  against `websearch_to_tsquery('english', …)`, exposed as
-  `match_rag_chunks_lexical(...) RETURNS TABLE (...)` — the exact-term signal
-  the API fuses with dense scores.
-- **Governance columns:** `embedding_model` / `embedding_version` (the API's
-  fail-closed startup compatibility check reads these) + `tenant_id` /
-  `user_role` (the multi-tenant seam). `rag_query_log` captures retrieval
-  telemetry.
+```mermaid
+flowchart LR
+    Q["API query"] --> D["pgvector: cosine over embedding"]
+    Q --> L["match_rag_chunks_lexical(query_text, k)"]
+    L --> TS["websearch_to_tsquery('english') @@ text_tsv (GIN)"]
+    TS --> RK["ts_rank_cd score"]
+    D --> FUSE["API-side alpha fusion"]
+    RK --> FUSE
+    FUSE --> OUT["ranked chunks -> grounding check"]
+    VAL["validate-infra.sh invariant 1"] -.->|"RETURNS TABLE covers every column search_lexical reads"| L
+    COMPAT["embedding_model/version cols"] -.->|"API startup compat: mixed spaces fail closed"| D
+```
 
-The lexical function's **column shape is CI-asserted** — the DB and the API
-cannot drift on this contract.
+`rag_query_log` captures retrieval telemetry for the eval/online loop.
+
+---
+
+## Migration timeline
+
+**Figure 5 — 11 forward-only migrations (facts).**
+
+```mermaid
+gantt
+    dateFormat YYYY-MM-DD
+    title Migration history (each bar = one forward-only migration)
+    section Core
+    core schema (2 migrations)        :done, 2026-04-04, 1d
+    interview_upgrade (idempotency, audit) :done, 2026-04-17, 1d
+    section RAG
+    create_rag_chunks (pgvector)      :done, 2026-04-08, 1d
+    hybrid_lexical (tsv + GIN + fn)   :done, 2026-05-29, 1d
+    rag_query_log                     :done, 2026-05-29, 1d
+    rag_chunks_governance (versions, tenant) :done, 2026-07-08, 1d
+    section Concierge
+    conversations + messages          :done, 2026-06-26, 1d
+    section Governance
+    ai_audit_log (WORM)               :done, 2026-07-08, 1d
+    ai_guardrail_daily view           :done, 2026-07-09, 1d
+    retention schedule fn             :done, 2026-07-09, 1d
+```
+
+Rules: timestamp-named, never edited after apply, idempotent (`IF NOT EXISTS` /
+`CREATE OR REPLACE`), additive — the Java `validate` contract keeps passing.
+
+---
 
 ## Edge functions
 
-**14 Deno/TypeScript functions**, most verifying the Supabase bearer JWT
-(`supabase.auth.getUser`) before acting:
+**Figure 6 — the 14 functions by group.** Most verify the Supabase bearer JWT
+(`supabase.auth.getUser`) **before** acting.
 
-| Group | Functions |
-|---|---|
-| AI advisories | `ai-shipping-advisor` · `ai-tracking-advisor` · `ai-priority-interpreter` · `ai-notification-generator` |
-| Quotes & saved options | `get-shipping-quotes` · `get-saved-options` · `save-option` · `remove-saved-option` |
-| Booking & address | `generate-book-redirect` · `validate-address` |
-| Logistics helpers | `find-dropoff-locations` · `escalate-tracking-issue` · `create-shipment-reminders` · `import-tracking-from-email` |
+```mermaid
+flowchart TB
+    U["Browser (Supabase JWT)"] --> GATE["supabase.auth.getUser(bearer) — verify BEFORE acting"]
+    subgraph AI["AI advisories"]
+        A1[ai-shipping-advisor]
+        A2[ai-tracking-advisor]
+        A3[ai-priority-interpreter]
+        A4[ai-notification-generator]
+    end
+    subgraph QSO["Quotes & saved options"]
+        B1[get-shipping-quotes]
+        B2[get-saved-options]
+        B3[save-option]
+        B4[remove-saved-option]
+    end
+    subgraph BK["Booking & address"]
+        C1[generate-book-redirect]
+        C2[validate-address]
+    end
+    subgraph LOG["Logistics helpers"]
+        D1[find-dropoff-locations]
+        D2[escalate-tracking-issue]
+        D3[create-shipment-reminders]
+        D4[import-tracking-from-email]
+    end
+    GATE --> AI
+    GATE --> QSO
+    GATE --> BK
+    GATE --> LOG
+    AI --> DB[("Postgres")]
+    QSO --> DB
+    BK --> DB
+    LOG --> DB
+```
 
-## The four-invariant validator
-
-`scripts/validate-infra.sh` fails CI (alongside **shellcheck** + **ruff**) when:
-
-1. the **RAG lexical contract** breaks — `match_rag_chunks_lexical` missing, or
-   its `RETURNS TABLE` no longer covers every column the API reads
-   (checked column-by-column);
-2. any edge function loses its **`Deno.serve`** handler;
-3. any migration filename breaks the **timestamp convention**;
-4. the **WORM append-only guard** itself is absent — the governance control is
-   regression-tested.
-
-On success it prints the live counts — the validator doubles as the inventory.
+---
 
 ## Governance read side
 
-`ai_guardrail_daily` is a SQL **view** — `unnest(decisions ||
-guardrail_events)` over the ledger, filtered to the canonical `guardrail:*` /
-`budget:*` vocabulary, grouped per (day, tag). Dashboards read the view; the
-WORM log itself is never scanned or touched. It is the SQL twin of the API's
-in-process guardrail metrics.
+**Figure 7 — `ai_guardrail_daily`: dashboards never touch the ledger.** The SQL
+twin of the API's in-process guardrail metrics — deliberately a plain view (the
+log is small; zero refresh machinery).
+
+```mermaid
+flowchart LR
+    W[("ai_audit_log (WORM)")] --> V["VIEW: CROSS JOIN LATERAL unnest(decisions || guardrail_events)"]
+    V --> F["WHERE tag LIKE guardrail:% OR budget:%"]
+    F --> G["GROUP BY day, tag -> counts"]
+    G --> DASH["dashboards / alerts"]
+```
+
+---
+
+## The four-invariant validator
+
+**Figure 8 — infra-as-contract: `validate-infra.sh` in CI.** On success it
+prints the live counts — the validator doubles as the inventory. CI also runs
+**shellcheck** and **ruff**.
+
+```mermaid
+flowchart TB
+    CI["CI run"] --> V["validate-infra.sh"]
+    V --> I1{"1 · match_rag_chunks_lexical exists AND RETURNS TABLE covers every column the API reads?"}
+    V --> I2{"2 · every edge function has a Deno.serve handler?"}
+    V --> I3{"3 · every migration filename timestamp-ordered?"}
+    V --> I4{"4 · WORM append-only guard present?"}
+    I1 -->|no| F["exit non-zero — build fails"]
+    I2 -->|no| F
+    I3 -->|no| F
+    I4 -->|no| F
+    I1 -->|yes| OK["OK — infra invariants hold (N fns, M migrations)"]
+    I2 -->|yes| OK
+    I3 -->|yes| OK
+    I4 -->|yes| OK
+```
+
+| # | Invariant | Failure it prevents |
+|---|---|---|
+| 1 | lexical-fn column contract | silent API↔DB drift |
+| 2 | `Deno.serve` per function | dead/unroutable function ships |
+| 3 | timestamp naming | migration-ordering bugs |
+| 4 | WORM guard present | the governance control itself regressing |
+
+---
+
+## Threat model
+
+| Threat | Control |
+|---|---|
+| Cross-user reads | RLS on the 8 core tables |
+| Audit tampering | WORM trigger (UPDATE never; DELETE gated) |
+| Silent retention abuse | transaction-scoped `shipsmart.retention_job` GUC |
+| Schema drift | 4-invariant validator + Java `ddl-auto: validate` |
+| Mixed embedding spaces | version columns + API fail-closed startup check |
+| Unauthenticated edge calls | `supabase.auth.getUser` before acting |
+
+Durability/availability ride on managed Postgres (backups/PITR as platform
+features) *(illustrative)*; the retention function is designed for a daily
+invocation.
+
+---
 
 ## Scripts & local development
 
