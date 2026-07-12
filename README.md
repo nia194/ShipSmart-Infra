@@ -1,22 +1,27 @@
 # ShipSmart — Infrastructure (`infra`)
 
 [![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20Auth-3ECF8E?logo=supabase&logoColor=white)](https://supabase.com/)
-[![pgvector](https://img.shields.io/badge/pgvector-RAG%20store-336791?logo=postgresql&logoColor=white)](https://github.com/pgvector/pgvector)
-[![Flyway](https://img.shields.io/badge/Flyway-Validate%20Mode-CC0200?logo=flyway&logoColor=white)](https://flywaydb.org/)
-[![Deno](https://img.shields.io/badge/Deno-Edge%20Functions-000000?logo=deno&logoColor=white)](https://deno.land/)
-[![Render](https://img.shields.io/badge/Deploy-Render-46E3B7?logo=render&logoColor=white)](https://render.com/)
+[![pgvector](https://img.shields.io/badge/pgvector-hybrid%20RAG%20store-336791?logo=postgresql&logoColor=white)](https://github.com/pgvector/pgvector)
+[![RLS](https://img.shields.io/badge/RLS-8%20core%20tables-0A7EA4)](#row-level-security)
+[![WORM](https://img.shields.io/badge/audit-WORM%20%2B%20retention-FF8A5B)](#the-worm-audit-ledger)
+[![Deno](https://img.shields.io/badge/Deno-14%20edge%20functions-000000?logo=deno&logoColor=white)](https://deno.land/)
+[![Validator](https://img.shields.io/badge/CI-4--invariant%20validator-3FB950)](#the-four-invariant-validator)
 [![License](https://img.shields.io/badge/License-See%20LICENSE-blue)](./LICENSE)
 
-Single-source-of-truth repo for everything that lives *between* the four
-ShipSmart services: Supabase schema migrations, edge functions, local
-dev scripts, environment matrices, deployment runbooks, and the
-architectural docs that describe how the sibling repos fit together.
+> The **data + serverless substrate** of the ShipSmart platform: 11 forward-only
+> migrations, Row-Level Security on every core user-owned table, a **WORM audit
+> ledger** whose tamper-evidence is a trigger and whose retention schedule is a
+> reviewed SQL function, **hybrid (dense + lexical) vector search** whose column
+> contract is CI-asserted against the API — all guarded by a custom
+> **four-invariant validator**. The database doesn't just store the platform's
+> data; it **enforces the platform's promises.**
 
-This repo has **no Render service of its own** — it ships database
-schema, edge functions, and the documentation that the other four
-repos consume.
+This repo has **no Render service of its own** — it ships schema, edge
+functions, dev scripts, and the invariants the other services depend on. (For
+the live system, see the umbrella's live-mesh links.)
 
-**Stack:** Supabase (Postgres 15 + Auth) · pgvector · Deno edge functions · Bash dev tooling · Markdown docs · Render Blueprints (per-service, referenced from here)
+**Stack:** Supabase (Postgres 15 + Auth) · pgvector · tsvector/GIN lexical ·
+Deno/TypeScript edge functions · Bash tooling · shellcheck + ruff CI
 
 ---
 
@@ -24,416 +29,148 @@ repos consume.
 
 - [The ShipSmart ecosystem](#the-shipsmart-ecosystem)
 - [What this repo owns](#what-this-repo-owns)
-- [Repo layout](#repo-layout)
-- [Supabase: migrations and edge functions](#supabase-migrations-and-edge-functions)
-- [Scripts](#scripts)
-- [Documentation map](#documentation-map)
-- [Local development](#local-development)
-- [Deployment](#deployment)
-- [Environment variables](#environment-variables)
-- [Operational notes](#operational-notes)
+- [Migrations](#migrations)
+- [Row-Level Security](#row-level-security)
+- [The WORM audit ledger](#the-worm-audit-ledger)
+- [Hybrid vector search](#hybrid-vector-search)
+- [Edge functions](#edge-functions)
+- [The four-invariant validator](#the-four-invariant-validator)
+- [Governance read side](#governance-read-side)
+- [Scripts & local development](#scripts--local-development)
 - [License](#license)
 
 ---
 
 ## The ShipSmart ecosystem
 
-ShipSmart is split across six sibling repositories. Clone them under
-the same parent directory so the dev scripts in this repo can find them
-by relative path. All six are also mirrored together in
-**[ShipSmart](https://github.com/nia194/ShipSmart)** — the umbrella
-repository that snapshots each component at its latest stable milestone.
+One of six sibling repositories — clone them under the same parent directory so
+the dev scripts can find them by relative path. All six are also mirrored
+together in **[ShipSmart](https://github.com/nia194/ShipSmart)** — the umbrella
+repository that snapshots each component at a pinned commit (see its
+`COMPONENTS.yml`).
 
 | Repo | Role | Stack | Render service |
 |---|---|---|---|
-| [ShipSmart-Web](https://github.com/nia194/ShipSmart-Web) | React SPA — user-facing UI | React 19, Vite, TypeScript | `shipsmart-web` (static site) |
-| [ShipSmart-Orchestrator](https://github.com/nia194/ShipSmart-Orchestrator) | Java transactional API — **single writer** to Supabase Postgres; quotes, bookings, saved options, carrier integration | Spring Boot 3.4, Java 17 | `shipsmart-api-java` |
-| [ShipSmart-API](https://github.com/nia194/ShipSmart-API) | Python AI/orchestration service — RAG, advisors, recommendations, compliance (UC2), multi-agent workflow (UC3/UC4) | FastAPI, Python 3.13 | `shipsmart-api-python` |
-| [ShipSmart-MCP](https://github.com/nia194/ShipSmart-MCP) | MCP tool server — `validate_address`, `get_quote_preview` (provider-pluggable) | FastAPI + MCP | `shipsmart-mcp` |
-| **[ShipSmart-Infra](https://github.com/nia194/ShipSmart-Infra)** *(this repo)* | Supabase schema + edge functions + deployment configs + docs | Supabase, Deno, Bash, Markdown | — (no Render service) |
-| [ShipSmart-Test](https://github.com/nia194/ShipSmart-Test) | Cross-repo integration harness — contract + live e2e suites, cross-service Postman collection | Python 3.13, pytest | — (no Render service) |
-
-```
-              ┌──────────────────────────────┐
-              │       ShipSmart-Web          │
-              │       React SPA · Vite       │
-              └──────────────┬───────────────┘
-                             │  Authorization: Bearer <Supabase JWT>
-                ┌────────────┴────────────┐
-                ▼                         ▼
-  ┌──────────────────────────────┐   ┌──────────────────────────────┐
-  │  ShipSmart-Orchestrator      │◀──│        ShipSmart-API         │
-  │  Java / Spring Boot          │   │       Python / FastAPI       │
-  │  Sole writer to Postgres     │   │   RAG · advisors · recs      │
-  │  Carrier integration (FedEx) │   │   Forwards JWT to Java for   │
-  │                              │   │   quote hydration            │
-  └──────────────┬───────────────┘   └──────────────┬───────────────┘
-                 │                                  │
-                 │                                  ▼
-                 │                   ┌──────────────────────────────┐
-                 │                   │        ShipSmart-MCP         │
-                 │                   │   shipping tools (HTTP/MCP)  │
-                 │                   │   validate_address, quotes   │
-                 │                   └──────────────────────────────┘
-                 ▼
-  ┌──────────────────────────────┐         ┌──────────────────────────────┐
-  │   Supabase Postgres + Auth   │ ◀────── │      ShipSmart-Infra         │
-  │   (managed cluster)          │         │   migrations · edge fns      │
-  └──────────────────────────────┘         │   docs · scripts · env       │
-                                           └──────────────────────────────┘
-```
-
-This repo never receives runtime traffic. It defines the schema the
-Java orchestrator validates against (Flyway in validate-mode), the
-pgvector table the Python service reads, and the edge functions the
-frontend can still fall back to via feature flags.
+| [ShipSmart-Web](https://github.com/nia194/ShipSmart-Web) | React SPA — search-first UI | React 19, Vite, TS | `shipsmart-web` |
+| [ShipSmart-Orchestrator](https://github.com/nia194/ShipSmart-Orchestrator) | Java system of record — single Postgres writer | Spring Boot 3.4, Java 17 | `shipsmart` |
+| [ShipSmart-API](https://github.com/nia194/ShipSmart-API) | Python AI layer — RAG, guardrails, agents | FastAPI, Python 3.13 | `shipsmart-api-python` |
+| [ShipSmart-MCP](https://github.com/nia194/ShipSmart-MCP) | Read-only MCP tool server | FastAPI + MCP | `shipsmart-mcp` |
+| **[ShipSmart-Infra](https://github.com/nia194/ShipSmart-Infra)** *(this repo)* | Schema + RLS + WORM ledger + pgvector + edge functions | Supabase, Deno, Bash | — |
+| [ShipSmart-Test](https://github.com/nia194/ShipSmart-Test) | Cross-repo contracts + evals + e2e | Python 3.13, pytest | — |
 
 ---
 
 ## What this repo owns
 
-| Concern | Lives in | Consumed by |
-|---|---|---|
-| Postgres schema (tables, RLS, triggers) | `supabase/migrations/` | Java Orchestrator (Flyway validate at boot); Web fallback edge fns |
-| `idempotency_keys`, `audit_log`, optimistic-locking, soft-delete, `status` columns | `supabase/migrations/20260417120000_interview_upgrade.sql` | Java Orchestrator (writes); Web reads via Java |
-| `rag_chunks` pgvector table | `supabase/migrations/20260408034204_create_rag_chunks.sql` | Python `ShipSmart-API` (RAG retrieval) |
-| `conversations`, `conversation_messages` (concierge recall) | `supabase/migrations/20260626120000_create_conversations.sql` | Python `ShipSmart-API` (CONVERSATION_STORE=postgres) |
-| Legacy/fallback edge functions (14) | `supabase/functions/` | Web SPA when `VITE_USE_JAVA_*=false` |
-| Local dev orchestration (multi-repo) | `scripts/dev-start.sh`, `check-env.sh`, `verify-post-deployment.sh` | Engineer workstations |
-| Aggregated env-var matrix | `.env.example`, `docs/env/` | All four service repos |
-| Deployment runbooks, cutover plans, smoke tests | `docs/deployment/`, `docs/post-deployment/` | Release engineering |
-| Architecture & system docs | `docs/architecture/`, `docs/architecture-summary.md`, `docs/gap-audit.md` | Engineers, reviewers, onboarding |
-| Per-carrier provider notes (UPS/FedEx/DHL/USPS) | `docs/providers/` | Anyone wiring carrier credentials |
-| Roadmap & phase history | `docs/roadmap/` | Project planning |
-
----
-
-## Repo layout
-
 ```
-ShipSmart-Infra/
-├── supabase/
-│   ├── config.toml                  Supabase CLI project config (project_id, ports, auth, functions)
-│   ├── migrations/                  Versioned SQL (Flyway-compatible naming)
-│   │   ├── 20260404030225_*.sql     Initial schema
-│   │   ├── 20260404030242_*.sql     Schema follow-up
-│   │   ├── 20260408034204_create_rag_chunks.sql        pgvector table for Python RAG
-│   │   ├── 20260417120000_interview_upgrade.sql        version/updated_at/deleted_at/status
-│   │   │                                               + idempotency_keys + audit_log
-│   │   ├── 20260529120000_rag_chunks_hybrid_lexical.sql tsvector + match_rag_chunks_lexical (hybrid RAG)
-│   │   ├── 20260529120500_rag_query_log.sql            agentic-RAG observability sink (opt-in)
-│   │   └── 20260626120000_create_conversations.sql     concierge recall (conversations + messages)
-│   ├── functions/                   14 Deno edge functions (see table below)
-│   └── snippets/                    Reference SQL snippets (not auto-applied)
-│
-├── scripts/
-│   ├── dev-start.sh                 Start web/java/python siblings (one or all)
-│   ├── check-env.sh                 Validate every repo's .env before dev-start
-│   ├── validate-infra.sh            This repo's test — contract-invariant guard over migrations + functions
-│   ├── verify-post-deployment.sh    Smoke-test deployed services
-│   └── build_study_guide.py         Generate study-guide artifacts under docs/assets/
-│
-├── docs/                            See "Documentation map" below
-├── legacy/
-│   └── render.yaml.legacy           Pre-split monorepo Render blueprint (reference only)
-├── .env.example                     Aggregated env vars across all 4 services
-├── LICENSE
-└── README.md                        (this file)
+supabase/
+  migrations/   11 timestamped, forward-only, idempotent .sql
+  functions/    14 Deno/TypeScript edge functions (JWT-verifying)
+  config.toml
+scripts/        validate-infra.sh · check-env.sh · dev-start.sh ·
+                verify-post-deployment.sh
 ```
 
----
+Three runtimes consume this one schema — Java via JPA with
+`ddl-auto: validate`, Python via asyncpg, the Web via edge functions — which is
+exactly why it is treated as **contract-checked code**, not "the database."
 
-## Supabase: migrations and edge functions
+## Migrations
 
-### Migrations
+**11 forward-only migrations** (2026-04 → 2026-07): core tables → pgvector RAG
+store → idempotency/audit hardening → **hybrid lexical** (tsvector + GIN +
+ranking function) → retrieval telemetry → concierge conversations → **WORM
+`ai_audit_log`** → RAG governance columns (embedding version, tenant seam) →
+guardrail metrics view → **retention schedule**.
 
-Migrations live under `supabase/migrations/` and are named with a
-`YYYYMMDDHHMMSS_description.sql` prefix so both the Supabase CLI and
-Flyway (in the Java Orchestrator) order them identically.
+Rules: timestamp-named, never edited after apply, idempotent
+(`IF NOT EXISTS` / `CREATE OR REPLACE`), additive — the Java `validate` contract
+keeps passing.
 
-| Migration | Adds |
+## Row-Level Security
+
+RLS is **enabled on all 8 core user-owned tables** — `profiles`, `user_roles`,
+`shipment_requests`, `quotes`, `saved_options`, `redirect_tracking`,
+`idempotency_keys`, `audit_log` — with owner-scoped policies. Isolation is
+enforced **inside the database**, so even a compromised app path can't read
+across users. (The newer AI-plane tables are service-role-accessed by design;
+their RLS hardening is tracked as a governance follow-up.)
+
+## The WORM audit ledger
+
+`ai_audit_log` is append-only by **trigger**, not by promise:
+
+- `UPDATE` ⇒ `RAISE EXCEPTION` — always.
+- `DELETE` ⇒ blocked **unless** the transaction-scoped GUC
+  `shipsmart.retention_job = 'on'` — which only
+  `ai_audit_log_apply_retention()` sets, for its own transaction.
+- Identity is pseudonymized (`session_id_hash`); free text is redacted upstream.
+- Retention classes: **`pii_short` 30 days · `standard` 13 months · `extended`
+  24 months** — a `CASE` in a reviewed SQL function, designed for a daily call.
+
+"Prove what the AI did" is a query — and the record can neither be silently
+edited nor silently evaporate.
+
+## Hybrid vector search
+
+`rag_chunks` supports both retrieval modes **inside Postgres**:
+
+- **Dense:** pgvector cosine over embeddings.
+- **Lexical:** a `text_tsv` tsvector + **GIN** index ranked by `ts_rank_cd`
+  against `websearch_to_tsquery('english', …)`, exposed as
+  `match_rag_chunks_lexical(...) RETURNS TABLE (...)` — the exact-term signal
+  the API fuses with dense scores.
+- **Governance columns:** `embedding_model` / `embedding_version` (the API's
+  fail-closed startup compatibility check reads these) + `tenant_id` /
+  `user_role` (the multi-tenant seam). `rag_query_log` captures retrieval
+  telemetry.
+
+The lexical function's **column shape is CI-asserted** — the DB and the API
+cannot drift on this contract.
+
+## Edge functions
+
+**14 Deno/TypeScript functions**, most verifying the Supabase bearer JWT
+(`supabase.auth.getUser`) before acting:
+
+| Group | Functions |
 |---|---|
-| `20260404030225_…sql` | Initial baseline schema. |
-| `20260404030242_…sql` | Schema follow-up corrections. |
-| `20260408034204_create_rag_chunks.sql` | `rag_chunks` table with `vector(1536)` column for `ShipSmart-API`'s pgvector RAG store. |
-| `20260417120000_interview_upgrade.sql` | Optimistic-locking (`version`, `updated_at`), soft-delete (`deleted_at`), `status` columns, plus new `idempotency_keys` and `audit_log` tables consumed by the Java Orchestrator. Flyway runs in *validate* mode and mirrors this file 1:1. |
-| `20260529120000_rag_chunks_hybrid_lexical.sql` | Adds a generated `tsvector` column + GIN index and the `match_rag_chunks_lexical(...)` ranking function to `rag_chunks`, so `ShipSmart-API` can run a lexical query alongside the dense pgvector query and fuse them (hybrid RAG). Additive + idempotent; leaves the dense path untouched. Python-owned plane — **not** mirrored to Java Flyway. |
-| `20260529120500_rag_query_log.sql` | Append-only `rag_query_log` sink for agentic-RAG observability (plan, retrieved chunks, decision path). Written only when `RAG_QUERY_LOG=true` (off by default); telemetry with no FK into business tables and no RLS coupling. Python-owned plane — **not** mirrored to Java Flyway. |
-| `20260626120000_create_conversations.sql` | `conversations` + `conversation_messages` for the Conversational Concierge's server-side recall. Python-owned data plane (direct asyncpg, written only when `CONVERSATION_STORE=postgres`); additive, no FK into business tables, no RLS coupling — **not** mirrored to Java Flyway. |
+| AI advisories | `ai-shipping-advisor` · `ai-tracking-advisor` · `ai-priority-interpreter` · `ai-notification-generator` |
+| Quotes & saved options | `get-shipping-quotes` · `get-saved-options` · `save-option` · `remove-saved-option` |
+| Booking & address | `generate-book-redirect` · `validate-address` |
+| Logistics helpers | `find-dropoff-locations` · `escalate-tracking-issue` · `create-shipment-reminders` · `import-tracking-from-email` |
 
-> **Schema contract:** the Java Orchestrator boots with
-> `FlywayValidationRunner` in validate-mode — a pending or drifted
-> migration is fatal at startup. When changing a **Java-owned** table, land the
-> migration here first, copy the same `.sql` file into
-> `ShipSmart-Orchestrator/src/main/resources/db/migration/`, then ship
-> both repos together. **Python-owned data-plane** tables (`rag_chunks`,
-> `rag_query_log`, `conversations`/`conversation_messages`) are additive and
-> accessed only by `ShipSmart-API` via direct asyncpg — they are **not** mirrored
-> to Java Flyway and never affect its validate.
+## The four-invariant validator
 
-Apply locally:
+`scripts/validate-infra.sh` fails CI (alongside **shellcheck** + **ruff**) when:
 
-```bash
-supabase db push                       # apply pending migrations
-supabase migration new <description>   # scaffold a new migration
-```
+1. the **RAG lexical contract** breaks — `match_rag_chunks_lexical` missing, or
+   its `RETURNS TABLE` no longer covers every column the API reads
+   (checked column-by-column);
+2. any edge function loses its **`Deno.serve`** handler;
+3. any migration filename breaks the **timestamp convention**;
+4. the **WORM append-only guard** itself is absent — the governance control is
+   regression-tested.
 
-### Edge functions (legacy fallback)
+On success it prints the live counts — the validator doubles as the inventory.
 
-All 14 functions under `supabase/functions/` predate the
-Java/Python split. Most are still wired into the React app as
-fallbacks behind `VITE_USE_JAVA_*` flags — set the flag to `false` to
-re-route a given feature through the edge function instead of the Java
-API.
+## Governance read side
 
-| Function | Status | Modern equivalent |
-|---|---|---|
-| `get-shipping-quotes` | Fallback | Java `POST /api/v1/quotes` |
-| `get-saved-options` | Fallback | Java `GET /api/v1/saved-options` |
-| `save-option` | Fallback | Java `POST /api/v1/saved-options` |
-| `remove-saved-option` | Fallback | Java `DELETE /api/v1/saved-options/{id}` |
-| `generate-book-redirect` | Fallback | Java `POST /api/v1/bookings/redirect` |
-| `validate-address` | Fallback | MCP `validate_address` tool |
-| `ai-shipping-advisor` | Fallback | Python `POST /api/v1/advisor/shipping` |
-| `ai-tracking-advisor` | Fallback | Python `POST /api/v1/advisor/tracking` |
-| `ai-priority-interpreter` | Legacy | (no current equivalent — flagged in `docs/roadmap/`) |
-| `ai-notification-generator` | Legacy | (no current equivalent) |
-| `find-dropoff-locations` | Legacy | (no current equivalent) |
-| `escalate-tracking-issue` | Legacy | (no current equivalent) |
-| `import-tracking-from-email` | Legacy | (no current equivalent) |
-| `create-shipment-reminders` | Legacy | (no current equivalent) |
+`ai_guardrail_daily` is a SQL **view** — `unnest(decisions ||
+guardrail_events)` over the ledger, filtered to the canonical `guardrail:*` /
+`budget:*` vocabulary, grouped per (day, tag). Dashboards read the view; the
+WORM log itself is never scanned or touched. It is the SQL twin of the API's
+in-process guardrail metrics.
 
-See `docs/roadmap/` for the classification of each function and the
-plan for retiring vs. keeping them.
-
-Deploy / update from this repo:
+## Scripts & local development
 
 ```bash
-supabase functions deploy <function-name>
-supabase functions deploy --all   # all 14
+./scripts/check-env.sh                 # env matrix sanity
+./scripts/dev-start.sh                 # local supabase workflow
+./scripts/validate-infra.sh            # the 4 invariants (run in CI)
+./scripts/verify-post-deployment.sh    # post-deploy probes
 ```
-
----
-
-## Scripts
-
-All scripts live in `scripts/` and assume the four service repos are
-cloned as siblings of this one.
-
-| Script | Purpose |
-|---|---|
-| `dev-start.sh [web\|java\|python\|all]` | Start one or all sibling services with their expected ports (web 5173, java 8080, python 8000). Checks `.env` presence before launching. |
-| `check-env.sh` | Validate that each sibling repo has its `.env`/`.env.local` and that required keys are non-empty. Run this before `dev-start.sh`. |
-| `validate-infra.sh` | **This repo's test.** Greps the migrations + edge functions for the contract invariants downstream services depend on, and exits non-zero on drift. Run before deploying a schema/function change. |
-| `verify-post-deployment.sh` | Hit live `/health` endpoints across the deployed Render services and report status. Use after every promotion. |
-| `build_study_guide.py` | Compile architectural docs into `.docx`/`.pdf` study guides under `docs/assets/` (gitignored). |
-
-### Validation
-
-This repo has no application code to unit-test, so `validate-infra.sh` is its
-test suite — a lightweight guard for the invariants that, if they drift, silently
-break a consumer:
-
-```bash
-bash scripts/validate-infra.sh
-```
-
-It asserts (1) the hybrid-RAG `match_rag_chunks_lexical(...)` function exists and
-`RETURNS TABLE (id, source, chunk_index, text, score)` — the exact shape
-`ShipSmart-API`'s `pgvector_store.search_lexical()` unpacks and `ShipSmart-Test`'s
-contract test asserts; (2) every `supabase/functions/*/index.ts` registers a
-`Deno.serve` handler; (3) every migration filename is timestamp-orderable.
-
-CI (`.github/workflows/ci.yml`) does not run `validate-infra.sh`; instead it lints the
-**maintained automation scripts** — **shellcheck** (errors only) over `scripts/*.sh` and
-**ruff** over the Python scripts. The legacy edge functions are intentionally not linted
-(they are frozen pending migration/retirement — see `docs/roadmap/`).
-
----
-
-## Documentation map
-
-The `docs/` tree is topic-organized. Snapshot docs at the root capture
-the *current* state of the system; subdirectories carry historical and
-specialized material.
-
-### Start here
-
-| Doc | What it is |
-|---|---|
-| `docs/architecture-summary.md` | Current truth of the 5-service system. |
-| `docs/gap-audit.md` | Per-topic *Implement / Partial / Reject* verdicts. |
-| `docs/implementation-plan.md` | Phase A → D delivery plan. |
-| `docs/interview-upgrade-summary.md` | Cross-repo change summary for the latest schema/contract update. |
-
-### By topic
-
-| Folder | Contents |
-|---|---|
-| `docs/architecture/` | System flow, AI-feature architecture, MCP tooling architecture, service boundaries, advisor flows, current-system-state, full-system-integration. |
-| `docs/backend/` | FastAPI foundations + backend phases 1–4. |
-| `docs/frontend/` | Migration plan, AI integration, runtime checklist, status. |
-| `docs/llm/` | LLM integration, provider setup, runtime modes, model routing/selection. |
-| `docs/rag/` | RAG architecture, content structure, retrieval quality, knowledge-base guide. |
-| `docs/providers/` | `FEDEX_INTEGRATION_SUMMARY.md` + UPS/FedEx/DHL/USPS setup, runtime modes, capability matrix. |
-| `docs/deployment/` | `DEPLOYMENT-DAY-RUNBOOK.md`, cutover/launch plans, pre-deployment checklist, smoke tests. |
-| `docs/post-deployment/` | Post-deploy smoke tests, stabilization notes, post-phase13 next steps. |
-| `docs/env/` | Production env matrix/reference; `ENV-VARS-COPY-PASTE.md` and `CREDENTIALS-GATHERING-GUIDE.md` (local-only, gitignored). |
-| `docs/roadmap/` | `OPTION-B1-START-HERE.md`, automation index, interview/next-iteration roadmaps, phase history, migration checklist, known limitations, what-not-to-build, legacy edge functions. |
-| `docs/guides/` | `local-development.md` and other how-tos. |
-| `docs/assets/` | UI screenshots (`images/`), study-guide outputs (`.docx`/`.pdf`, gitignored). |
-
----
-
-## Local development
-
-### Prerequisites
-
-- **Node.js 20+** and **pnpm 9+** (for `ShipSmart-Web`)
-- **Java 17+** (for `ShipSmart-Orchestrator`)
-- **Python 3.13** and [`uv`](https://docs.astral.sh/uv/) 0.6.5+ (for `ShipSmart-API` and `ShipSmart-MCP`)
-- **Supabase CLI** (for migrations + edge functions)
-- All six repos cloned as siblings under the same parent directory
-
-```
-parent/
-├── ShipSmart-Web/
-├── ShipSmart-Orchestrator/
-├── ShipSmart-API/
-├── ShipSmart-MCP/
-├── ShipSmart-Test/    (cross-repo contract + e2e)
-└── ShipSmart-Infra/   (you are here)
-```
-
-### One-time setup
-
-```bash
-# 1. From ShipSmart-Infra: copy aggregated env-var template into each repo
-cp .env.example ../ShipSmart-Web/.env.local           # keep VITE_* lines
-cp .env.example ../ShipSmart-Orchestrator/.env        # keep Java / FedEx / DB lines
-cp .env.example ../ShipSmart-API/.env                 # keep Python / LLM / RAG lines
-cp .env.example ../ShipSmart-MCP/.env                 # keep MCP_API_KEY + SHIPPING_PROVIDER lines
-
-# 2. Validate that every repo has its env wired up
-bash scripts/check-env.sh
-
-# 3. Apply Supabase migrations (against your local or remote project)
-supabase db push
-```
-
-### Day-to-day
-
-```bash
-# Start web + java + python in three labeled tabs
-bash scripts/dev-start.sh all
-
-# Or start one at a time
-bash scripts/dev-start.sh web      # http://localhost:5173
-bash scripts/dev-start.sh java     # http://localhost:8080
-bash scripts/dev-start.sh python   # http://localhost:8000
-
-# MCP server is started separately:
-cd ../ShipSmart-MCP && uv run uvicorn app.main:app --reload --port 8001
-```
-
-### After deploying
-
-```bash
-bash scripts/verify-post-deployment.sh    # /health on all live services
-```
-
----
-
-## Deployment
-
-There is **no Render service for this repo**. Each application repo
-owns its own `render.yaml`, and Render reads the blueprint from the
-repo a service is linked to:
-
-| Blueprint | Service on Render |
-|---|---|
-| `ShipSmart-Web/render.yaml` | `shipsmart-web` — Static site |
-| `ShipSmart-Orchestrator/render.yaml` | `shipsmart-api-java` — Java web service |
-| `ShipSmart-API/render.yaml` | `shipsmart-api-python` — Python web service (FastAPI AI/advisory) |
-| `ShipSmart-MCP/render.yaml` | `shipsmart-mcp` — Python web service (MCP tool server) |
-
-Supabase migrations and edge functions are deployed via the Supabase
-CLI from this repo:
-
-```bash
-supabase db push                    # apply pending migrations
-supabase functions deploy --all     # deploy all 14 edge functions
-```
-
-`legacy/render.yaml.legacy` is the pre-split monorepo blueprint, kept
-only for reference. Do not deploy from it.
-
-### Release order
-
-When promoting a schema-changing release, the safe order is:
-
-1. **Apply migrations** (`supabase db push`) so the column/table exists.
-2. **Promote `ShipSmart-Orchestrator`** — Flyway boots against the new schema in validate mode.
-3. **Promote `ShipSmart-API`** — only matters if `rag_chunks` shape changed.
-4. **Promote `ShipSmart-MCP`** if its contract changed.
-5. **Promote `ShipSmart-Web`** last so the UI never reaches a backend that hasn't yet seen the schema.
-6. **Run `bash scripts/verify-post-deployment.sh`** and follow `docs/post-deployment/`.
-
-See `docs/deployment/DEPLOYMENT-DAY-RUNBOOK.md` for the full checklist.
-
----
-
-## Environment variables
-
-`.env.example` at the repo root is the **canonical, aggregated** list
-of every env var used across the four service repos. Each section is
-labeled with the consuming repo and the file it should land in:
-
-| Section in `.env.example` | Destination file |
-|---|---|
-| `# Web (ShipSmart-Web/.env.local)` | `../ShipSmart-Web/.env.local` |
-| `# Orchestrator / Java (ShipSmart-Orchestrator/.env)` | `../ShipSmart-Orchestrator/.env` |
-| `# API / Python (ShipSmart-API/.env)` | `../ShipSmart-API/.env` |
-| `# MCP (ShipSmart-MCP/.env)` | `../ShipSmart-MCP/.env` |
-
-Production values never live in these files — they are set on the
-Render dashboard, marked `sync: false` in each service's `render.yaml`,
-and recorded in `docs/env/ENV-VARS-COPY-PASTE.md` (gitignored, local
-only).
-
-The two values that consistently bite new contributors:
-
-- **`VITE_SUPABASE_ANON_KEY`** — without it the React app builds and
-  serves successfully but every auth-gated page is broken.
-- **`SUPABASE_JWT_SECRET`** — without it, the Java Orchestrator
-  rejects every authenticated request with `401`.
-
-Both come from the Supabase dashboard (Settings → API).
-
----
-
-## Operational notes
-
-- **Schema drift between repos.** This repo and
-  `ShipSmart-Orchestrator/src/main/resources/db/migration/` must hold
-  byte-identical migration files. Flyway in validate mode is the
-  enforcement mechanism; if Java refuses to boot on a fresh deploy,
-  diff the two folders first.
-- **Edge functions vs. Java API.** Both are live and reachable. The
-  React app picks between them via `VITE_USE_JAVA_*` flags — use this
-  as a fast rollback path if a Java endpoint regresses.
-- **`config.toml` `project_id`.** Points to the production Supabase
-  project. Override with `SUPABASE_PROJECT_REF` env when working
-  against a personal Supabase instance to avoid accidental writes.
-- **`docs/assets/` artifacts.** `.docx`/`.pdf` outputs from
-  `build_study_guide.py` are gitignored on purpose — regenerate
-  locally rather than committing.
-- **`legacy/` is reference-only.** Don't deploy `render.yaml.legacy`;
-  it predates the four-repo split and will collide with the live
-  per-repo blueprints.
-
----
 
 ## License
 
-See [LICENSE](./LICENSE) for the full text.
+See [LICENSE](./LICENSE).
